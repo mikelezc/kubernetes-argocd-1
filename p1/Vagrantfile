@@ -1,0 +1,44 @@
+Vagrant.configure("2") do |config|
+  # Aquí especificamos el sistema base.
+  # Si usas macOS con Apple Silicon y un proveedor de arm64 en tu Mac,
+  # DESCOMENTA la siguiente línea y borra la de abajo:
+  # config.vm.box = "bento/ubuntu-22.04-arm64"
+  
+  config.vm.box = "bento/ubuntu-22.04"
+  
+  # Si usas VirtualBox, se intentará este bloque:
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 1024
+    v.cpus = 1
+  end
+
+  # ==========================================
+  # MÁQUINA 1: Server (Controller)
+  # ==========================================
+  config.vm.define "miguelS" do |server|
+    server.vm.hostname = "miguelS"
+    server.vm.network "private_network", ip: "192.168.56.110"
+    
+    server.vm.provider "virtualbox" do |v|
+      v.name = "miguelS"
+    end
+    
+    # Esto ejecuta el script cuando se crea la máquina
+    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+  end
+
+  # ==========================================
+  # MÁQUINA 2: Worker (Agent)
+  # ==========================================
+  config.vm.define "miguelSW" do |worker|
+    worker.vm.hostname = "miguelSW"
+    worker.vm.network "private_network", ip: "192.168.56.111"
+
+    worker.vm.provider "virtualbox" do |v|
+      v.name = "miguelSW"
+    end
+    
+    # Ejecuta el script del worker, pasándole la IP del jefe y la suya propia
+    worker.vm.provision "shell", path: "scripts/worker.sh", args: "192.168.56.110 192.168.56.111"
+  end
+end

@@ -1,0 +1,23 @@
+Vagrant.configure("2") do |config|
+  # config.vm.box = "bento/ubuntu-22.04-arm64" # (Descomentar para MacOS M4, comentar el de abajo)
+  config.vm.box = "bento/ubuntu-22.04"
+
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 1536  # Algo más de RAM para Kubectl y los pods
+    v.cpus = 1
+  end
+
+  # ==========================================
+  # MÁQUINA ÚNICA: Server de K3s (MiguelS)
+  # ==========================================
+  config.vm.define "miguelS" do |server|
+    server.vm.hostname = "miguelS"
+    server.vm.network "private_network", ip: "192.168.56.110"
+    
+    server.vm.provider "virtualbox" do |v|
+      v.name = "miguelS_p2"
+    end
+    
+    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+  end
+end

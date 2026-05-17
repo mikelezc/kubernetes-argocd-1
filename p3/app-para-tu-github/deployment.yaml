@@ -1,0 +1,53 @@
+# Copia el archivo ENTERO (junto a los guiones "---")
+# y ponlo en tu repo de Github, en un archivo llamado `deployment.yaml`
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wil-playground
+  namespace: dev # IMPORTANTE: debe ir en el namespace dev, tal y como indica el subject
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: playground
+  template:
+    metadata:
+      labels:
+        app: playground
+    spec:
+      containers:
+      - name: wil-playground
+        image: wil42/playground:v1 # <--- Este es el tag que tendrás que cambiar a v2 luego en tu Github!
+        ports:
+        - containerPort: 8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wil-playground
+  namespace: dev
+spec:
+  ports:
+  - port: 8888
+    targetPort: 8888
+  selector:
+    app: playground
+---
+# Ingress para poder entrar a la app por localhost:8888 en nuestra máquina
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: playground-ingress
+  namespace: dev
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: wil-playground
+            port:
+              number: 8888
