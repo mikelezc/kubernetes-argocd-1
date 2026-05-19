@@ -1,24 +1,24 @@
 # Parte 3: K3d y Argo CD (Concepto GitOps)
 
-## 🧠 ¿Qué aprendemos aquí? (Conceptos Clave)
+## Conceptos Clave
 El objetivo de la Parte 3 es abandonar el despliegue manual (donde alguien hace un `kubectl apply -f` o levanta los archivos a mano) y abrazar la automatización extrema y la metodología **GitOps**.
 
-1. **K3d (K3s in Docker)**: Es una herramienta que nos permite levantar un clúster K3s completo ¡dentro de contenedores Docker! Es decir, Docker es el único requisito. Ahorra muchísimos recursos, ya que levanta el server y los workers virtualizados en la misma máquina mediante contenedores.
+1. **K3d (K3s in Docker)**: Es una herramienta que nos permite levantar un clúster K3s completo dentro de contenedores Docker. Es decir, Docker es el único requisito. Ahorra muchísimos recursos, ya que levanta el server y los workers virtualizados en la misma máquina mediante contenedores.
 2. **Argo CD y GitOps**: GitOps significa que "El repositorio de Git es la única fuente de verdad". Instalaremos **Argo CD** en nuestro clúster. Argo CD es un bot vigilante que estará mirando TODO EL RATO a nuestro repositorio público de GitHub. Si en Github escribimos que queremos que `app1` tenga la versión `v2`, Argo CD lo detecta y lo cambia automáticamente en nuestro K3s. **¡Se acabó el intervenir manualmente!**
 
-## 📝 Requisitos Previos (Por tu parte)
+## Requisitos Previos
 
-Antes de levantar la máquina, debes conectar esto a TU GitHub personal:
+Antes de levantar la máquina, debemos conectar esto a nuestro GitHub personal:
 
-1. **Crea un Repo Público en GitHub**:
+1. **Creamos un Repo Público en GitHub**:
    - Nómbralo con tu nombre de usuario de 42, por ejemplo: `miguel-iot-argocd`.
    - Entra en la carpeta `app-para-tu-github/` de este proyecto, copia el archivo `deployment.yaml` de ahí y súbelo a tu nuevo repo.
    
-2. **Conéctalo en tus archivos locales de P3**:
+2. **Conectamos el Repo en tus archivos locales de P3**:
    - Entra en `confs/argocd.yaml`.
    - Busca donde dice `repoURL: ...` y cambia eso por la URL real de tu repositorio (por ejemplo: `https://github.com/TUGITHUB/miguel-iot-argocd.git`).
 
-## 🚀 ¿Cómo levantar todo?
+## ¿Cómo levantar todo?
 Aunque el subject dice que P3 no necesita Vagrant y que todo se ejecuta en consola sobre Linux, hemos **demostrado un extra de sofisticación** incorporando un Vagrantfile automatizado también aquí. 
 
 Te hemos preparado un Vagrantfile para que tu Mac (o el Linux de la escuela gracias al soporte Multi-Arquitectura) te proporcione una VM perfecta de 3GB de RAM.
