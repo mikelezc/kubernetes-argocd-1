@@ -37,6 +37,24 @@ k3d cluster delete iot-cluster || true
 k3d cluster create iot-cluster --api-port 6550 -p "8080:80@loadbalancer" -p "8888:8888@loadbalancer"
 
 echo "========================================================="
+echo " Configurando CoreDNS para usar resolvers públicos..."
+echo "========================================================="
+# Esperamos a que CoreDNS esté disponible
+sleep 10
+kubectl wait --for=condition=Ready pods -n kube-system -l k8s-app=kube-dns --timeout=60s || true
+
+# Parchear CoreDNS para usar Google/Cloudflare en lugar de /etc/resolv.conf
+# Esto evita problemas DNS intermitentes cuando los pods intenten resolver github.com
+kubectl -n kube-system get configmap coredns -o yaml | \
+  sed 's/forward \. \/etc\/resolv.conf/forward . 8.8.8.8 1.1.1.1/' | \
+  kubectl apply -f -
+
+# Reiniciar CoreDNS para aplicar cambios
+kubectl rollout restart deployment/coredns -n kube-system
+kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+echo "CoreDNS configurado exitosamente."
+
+echo "========================================================="
 echo " Creando Namespaces y Desplegando Argo CD..."
 echo "========================================================="
 kubectl create namespace argocd

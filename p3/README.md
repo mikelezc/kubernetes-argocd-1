@@ -48,7 +48,79 @@ Ahí debería verse ejecutándose la versión inicial de la Web (`wil42/playgrou
 *(Si quieres ver cómo está el robot ArgoCD trabajando por detrás, pregúntaselo entrando a tu clúster mediante `vagrant ssh miguelS` y explorando sus logs).*
 
 ## 🧹 Limpieza y Destrucción
+
+### Destrucción Simple (Normal)
 Al igual que en p1 y p2:
 ```bash
 vagrant destroy -f
+```
+
+### Limpieza Exhaustiva (Si la VM se cuelga o queda datos colgados)
+Si `vagrant up` falla repetidamente, usa este procedimiento completo:
+
+```bash
+# 1. Destruir la máquina
+vagrant destroy -f
+
+# 2. Limpiar estado de Vagrant
+rm -rf .vagrant/
+
+# 3. Verificar y limpiar procesos VMware colgados en tu Mac
+ps aux | grep -E "(vmware|vagrant)" | grep -v grep
+
+# 4. Si ves procesos viejos, matarlos (opcional, sólo si es necesario)
+sudo pkill -f vmware-usbarbitrator || true
+sudo pkill -f vagrant-vmware || true
+
+# 5. Relanzar
+vagrant up
+```
+
+## 🔍 Diagnósticos: Verificar Conectividad DNS del Cluster
+
+Si Argo CD muestra error `ComparisonError` tipo `lookup github.com on 10.43.0.10:53: no such host`, significa que CoreDNS dentro del cluster no puede resolver github.com.
+
+### Comandos de diagnóstico (ejecuta en orden):
+
+```bash
+# 1. Acceder a la VM
+vagrant ssh miguelS
+
+# Ya dentro de la VM, ejecuta esto:
+
+# 2. Comprobar DNS desde la VM (debería funcionar)
+nslookup github.com
+
+# 3. Ver si resolv.conf está bien
+cat /etc/resolv.conf
+
+# 4. Verificar que CoreDNS está corriendo
+kubectl get pods -n kube-system | grep coredns
+
+# 5. Ver logs de CoreDNS
+kubectl logs -n kube-system -l k8s-app=kube-dns --tail=20 || true
+
+# 6. Crear un pod temporal DENTRO del cluster y probar DNS desde ahí
+kubectl run -it --rm --restart=Never --image=alpine dns-test -- sh
+
+# Una vez dentro del pod alpine (verás prompt "/ #"):
+nslookup github.com
+ping -c 2 github.com
+curl -I https://github.com
+exit
+```
+
+### Si falla en el paso 6 (DNS desde dentro del cluster):
+
+```bash
+# Reiniciar CoreDNS
+kubectl rollout restart deployment/coredns -n kube-system
+kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+sleep 30
+
+# Repetir paso 6 para verificar que funciona
+
+# Luego, en Argo CD UI, pulsa REFRESH para que reintente leer el repo
+# O fuerza un pod nuevo del repo-server:
+kubectl -n argocd delete pod -l app.kubernetes.io/name=argocd-repo-server
 ```
