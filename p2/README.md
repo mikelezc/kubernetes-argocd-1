@@ -24,7 +24,7 @@ En la parte 1 levantamos la infraestructura básica (Nodos). En esta parte 2 dam
   ```
 > **Nota**: Igual que en la Parte 1, este Vagrantfile incorpora la lógica **Multi-Arquitectura**. Automáticamente usará VMware/Parallels si detecta Mac M4, o VirtualBox si se abre en otro equipo. 
 
-## Probarlo desde tu Mac (¡Sin entrar por SSH!)
+## Probarlo desde terminal
 Dado que Ingress ya expone los puertos 80 hacia el exterior, podemos consultarlos directamente usando curl y modificando su cabecera (Header -> `-H`):
 
 ```bash
@@ -37,6 +37,30 @@ curl -H "Host: app2.com" http://192.168.56.110
 # Probar App3 (Default genérico si el host se inventa o no coincide)
 curl -H "Host: meloinvento.test" http://192.168.56.110
 ```
+
+## Probarlo desde el navegador
+Para poder probarlo desde el navegador antes necesitarás modificar el archivo `/etc/hosts` de tu máquina anfitriona para que el sistema sepa que `app1.com`, `app2.com` y `app3.com` apuntan a la IP de la máquina virtual (`192.168.56.110`).
+
+Para ello, abre una terminal en tu Mac (no dentro de la VM) y ejecuta:
+
+```bash
+sudo nano /etc/hosts
+```
+
+Añade las siguientes líneas al final del archivo:
+
+```
+192.168.56.110 app1.com
+192.168.56.110 app2.com
+192.168.56.110 app3.com
+```
+
+Guarda el archivo (Ctrl+O, Enter) y sal (Ctrl+X).
+
+Ahora ya puedes abrir tu navegador y visitar:
+- `http://app1.com`
+- `http://app2.com`
+- `http://app3.com`
 
 ## Comandos Útiles de Kubernetes
 Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh miguelS`) y probar:
