@@ -74,7 +74,7 @@ kubectl rollout restart deployment/argocd-server -n argocd
 kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
 # Configuramos Argo CD para que se exponga sin SSL y poder entrar por puerto 8080 localmente.
-# En lugar de Ingress complejo, hacemos un Ingress muy básico hacia argo-server
+# Creamos un Ingress que responde SOLO a argocd.localhost para evitar conflictos.
 cat <<EOF | kubectl apply -n argocd -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -86,7 +86,8 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-  - http:
+  - host: argocd.localhost
+    http:
       paths:
       - path: /
         pathType: Prefix
