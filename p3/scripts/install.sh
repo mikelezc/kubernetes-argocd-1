@@ -34,7 +34,7 @@ k3d cluster delete iot-cluster || true
 
 # Creamos el cluster exponiendo el puerto 8888 para la aplicación y 
 # el puerto 8080 para la interfaz de Argo CD
-k3d cluster create iot-cluster --api-port 6550 -p "8080:80@loadbalancer" -p "8888:8888@loadbalancer"
+k3d cluster create iot-cluster --api-port 6550 -p "8080:80@loadbalancer" -p "8888:80@loadbalancer"
 
 echo "========================================================="
 echo " Configurando CoreDNS para usar resolvers públicos..."
