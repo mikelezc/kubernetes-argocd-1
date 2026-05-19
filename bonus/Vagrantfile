@@ -10,19 +10,22 @@ Vagrant.configure("2") do |config|
     provider = "virtualbox"
   end
 
-  # Configuración Global
+  # ==========================================
+  # CONFIGURACIÓN BONUS (GitLab asfixia la RAM)
+  # ==========================================
   config.vm.provider provider do |v|
+    # ¡GitLab oficial recomienda mínimo 4 GB! Usamos 6GB por si acaso.
     if provider == "virtualbox" || provider == "parallels"
-      v.memory = 1536
-      v.cpus = 1
+      v.memory = 6144
+      v.cpus = 3
     elsif provider == "vmware_desktop"
-      v.vmx["memsize"] = "1536"
-      v.vmx["numvcpus"] = "1"
+      v.vmx["memsize"] = "6144"
+      v.vmx["numvcpus"] = "3"
     end
   end
 
   # ==========================================
-  # MÁQUINA ÚNICA: Server de K3s (MiguelS)
+  # MÁQUINA DE DESPLIEGUE BONUS
   # ==========================================
   config.vm.define "miguelS" do |server|
     server.vm.hostname = "miguelS"
@@ -30,12 +33,13 @@ Vagrant.configure("2") do |config|
     
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS_p2"
+        v.name = "miguelS_bonus"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS_p2"
+        v.vmx["displayname"] = "miguelS_bonus"
       end
     end
     
-    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+    # En bonus el script de install debe instalar Docker, K3d, GitLab y ArgoCD.
+    server.vm.provision "shell", path: "scripts/install.sh", privileged: true
   end
 end

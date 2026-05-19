@@ -1,15 +1,30 @@
 Vagrant.configure("2") do |config|
-  # Aquí especificamos el sistema base.
-  # Si usas macOS con Apple Silicon y un proveedor de arm64 en tu Mac,
-  # DESCOMENTA la siguiente línea y borra la de abajo:
-  # config.vm.box = "bento/ubuntu-22.04-arm64"
-  
-  config.vm.box = "bento/ubuntu-22.04"
-  
-  # Si usas VirtualBox, se intentará este bloque:
-  config.vm.provider "virtualbox" do |v|
-    v.memory = 1024
-    v.cpus = 1
+  # ==========================================
+  # MAGIA CROSS-PLATFORM (ESCUELA vs MAC M4)
+  # ==========================================
+  # Determinamos la arquitectura del sistema donde se ejecuta:
+  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+    # === MAC APPLE SILICON (Tu M4 Pro) ===
+    config.vm.box = "bento/ubuntu-22.04"
+    # Vagrant en Mac M-Series usará Parallels o VMware (VirtualBox no existe aquí)
+    provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
+  else
+    # === ORDENADORES ESCUELA 42 (Intel/Linux) ===
+    config.vm.box = "bento/ubuntu-22.04"
+    provider = "virtualbox"
+  end
+
+  # ==========================================
+  # CONFIGURACIÓN GLOBAL (Recursos)
+  # ==========================================
+  config.vm.provider provider do |v|
+    if provider == "virtualbox" || provider == "parallels"
+      v.memory = 1024
+      v.cpus = 1
+    elsif provider == "vmware_desktop"
+      v.vmx["memsize"] = "1024"
+      v.vmx["numvcpus"] = "1"
+    end
   end
 
   # ==========================================
@@ -19,8 +34,12 @@ Vagrant.configure("2") do |config|
     server.vm.hostname = "miguelS"
     server.vm.network "private_network", ip: "192.168.56.110"
     
-    server.vm.provider "virtualbox" do |v|
-      v.name = "miguelS"
+    server.vm.provider provider do |v|
+      if provider == "virtualbox" || provider == "parallels"
+        v.name = "miguelS"
+      elsif provider == "vmware_desktop"
+        v.vmx["displayname"] = "miguelS"
+      end
     end
     
     # Esto ejecuta el script cuando se crea la máquina
@@ -34,8 +53,12 @@ Vagrant.configure("2") do |config|
     worker.vm.hostname = "miguelSW"
     worker.vm.network "private_network", ip: "192.168.56.111"
 
-    worker.vm.provider "virtualbox" do |v|
-      v.name = "miguelSW"
+    worker.vm.provider provider do |v|
+      if provider == "virtualbox" || provider == "parallels"
+        v.name = "miguelSW"
+      elsif provider == "vmware_desktop"
+        v.vmx["displayname"] = "miguelSW"
+      end
     end
     
     # Ejecuta el script del worker, pasándole la IP del jefe y la suya propia

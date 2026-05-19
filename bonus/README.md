@@ -1,20 +1,37 @@
-# Bonus: GitLab en Local
+# Bonus: GitLab On-Premise y GitOps 100% Local
 
-## ¿Qué hacemos aquí?
-El bonus pide instalar **GitLab en local** dentro del mismo clúster o en tu máquina, de manera que Argo CD no vigile GitHub en internet, ¡sino tu propio GitLab funcionando localmente!
+## 🧠 ¿Qué aprendemos aquí? (Conceptos Clave)
+El Bonus lleva el ecosistema GitOps a su expresión máxima de seguridad y privacidad a nivel empresarial. En lugar de depender de servidores en la nube (GitHub), desplegamos nuestro propio sistema de repositorios y CI/CD internamente (**GitLab On-Premise**). 
+
+1. **Independencia en la Nube**: Argo CD ya no dialoga con servidores externos. Se comunica de forma 100% interna dentro del mismo ecosistema local con nuestro propio GitLab.
+2. **Despliegues Complejos mediante Helm**: Kubernetes puro con YAMLs está limitado. Para desplegar "monstruos" enormes como GitLab (que incluye base de datos PostgreSQL, Redis, servidor web, repositorios git...), usamos **Helm**: el gestor de paquetes de K8s. Es el equivalente a hacer un "apt-get install" pero para clusters completos.
 
 > **⚠️ ADVERTENCIA DE RENDIMIENTO ⚠️**
-> GitLab es extremadamente pesado. Para correrlo de forma aceptable vas a necesitar que tu clúster tenga asignados **al menos 6 u 8 GB de RAM** y buenos CPUs. Dado que estás en un **Macbook M4 Pro**, no tendrás problemas de potencia, pero asegúrate de asignar suficiente RAM (si usas Docker Desktop o UTM, sube la memoria a 12GB o más).
+> GitLab es extremadamente pesado y glotón. Para correrlo de forma aceptable hemos automatizado la VM para que le asigne **6 GB de RAM y 3 CPUs** de tu Mac. (Tu Macbook M4 Pro no sudará, pero no abras 40 pestañas de Chrome a la vez mientras lo corres).
 
-## ¿Cómo ejecutarlo?
-1. Ejecuta el script de instalación:
+## 🚀 ¿Cómo levantar todo el ecosistema?
+Al igual que en las fases anteriores, hemos introducido un **Vagrantfile automatizado Multi-Arquitectura** aquí también.
+1. Abre tu terminal.
+2. Entra en esta carpeta (`cd bonus`).
+3. Lánzalo ejecutando:
    ```bash
-   sudo bash ./scripts/install.sh
+   vagrant up
    ```
-2. Este comando usará `Helm` para instalar un GitLab minimalista en el namespace `gitlab`.
-3. Tarda unos 5-10 minutos en arrancar todos los servicios.
+4. El script, sin que tú intercedas, instalará:
+   - Docker y K3d.
+   - El clúster `iot-cluster` vinculando puertos locales (8888 para la App, 80 para Gitlab).
+   - GitLab minimalista usando Helm.
+   - Argo CD y los despliegues pertinentes.
 
-## ¿Cómo usarlo con ArgoCD?
-1. Entrarás a `http://gitlab.local` (tendremos que mapearlo en tu `/etc/hosts` hacia 127.0.0.1).
-2. Te loguearás, crearás un repositorio.
-3. Subirás el código de tu web y apuntarás el `argocd.yaml` a la URL local de tu GitLab.
+> *Nota: Esta es la VM más grande. Tarda unos 5-10 minutos en levantar completamente porque descargar y descomprimir todos los contenedores de GitLab toma su tiempo.*
+
+## 🎯 Probarlo y jugar 
+1. **Acceder a GitLab Local:** Navegarás hacia donde hayas apuntado la IP de K3d (típicamente `http://localhost` o configurando `/etc/hosts` para `gitlab.local`).
+2. **Simular Día a Día:** Al igual que en la Parte 3, crearás un repositorio, pero esta vez dentro de este GitLab que tienes alojado tú mismo.
+3. Subirás el código de tu web, apuntarás el `argocd.yaml` a la URL de este repo interno, y observarás cómo las actualizaciones viajan desde tu base de datos interna directamente al publicador en vivo. ¡El círculo cerrado empresarial perfecto!
+
+## 🧹 Limpieza Obligatoria
+Al ser una VM tan pesada (6GB RAM dedicados de forma exclusiva), **es crítico que destruyas el entorno al terminar** si no lo estás usando, porque secuestrará esa memoria aunque no hagas nada.
+```bash
+vagrant destroy -f
+```

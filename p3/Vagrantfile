@@ -10,19 +10,21 @@ Vagrant.configure("2") do |config|
     provider = "virtualbox"
   end
 
-  # Configuración Global
+  # ==========================================
+  # CONFIGURACIÓN (K3D + ArgoCD es pesadito)
+  # ==========================================
   config.vm.provider provider do |v|
     if provider == "virtualbox" || provider == "parallels"
-      v.memory = 1536
-      v.cpus = 1
+      v.memory = 3072 # 3GB RAM para no sufrir con ArgoCD y K3D
+      v.cpus = 2
     elsif provider == "vmware_desktop"
-      v.vmx["memsize"] = "1536"
-      v.vmx["numvcpus"] = "1"
+      v.vmx["memsize"] = "3072"
+      v.vmx["numvcpus"] = "2"
     end
   end
 
   # ==========================================
-  # MÁQUINA ÚNICA: Server de K3s (MiguelS)
+  # MÁQUINA DE DESPLIEGUE P3
   # ==========================================
   config.vm.define "miguelS" do |server|
     server.vm.hostname = "miguelS"
@@ -30,12 +32,13 @@ Vagrant.configure("2") do |config|
     
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS_p2"
+        v.name = "miguelS_p3"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS_p2"
+        v.vmx["displayname"] = "miguelS_p3"
       end
     end
     
-    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+    # En p3 instalamos K3d y Docker desde el script
+    server.vm.provision "shell", path: "scripts/install.sh", privileged: true
   end
 end
