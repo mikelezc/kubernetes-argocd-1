@@ -18,7 +18,8 @@ spec:
     spec:
       containers:
       - name: wil-playground
-        image: wil42/playground:v1 # <--- Este es el tag que tendrás que cambiar a v2 luego en tu Github!
+        image: playground:v1 # Imagen local construida en install.sh (cambiar a v2)
+        imagePullPolicy: Never # No descargar de Docker Hub, usar local
         ports:
         - containerPort: 8888
 ---

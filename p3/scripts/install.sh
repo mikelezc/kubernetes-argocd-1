@@ -98,6 +98,31 @@ spec:
 EOF
 
 echo "========================================================="
+echo " Construyendo Imágenes Docker Locales (v1 y v2)..."
+echo "========================================================="
+# Obtener la ruta del Dockerfile (compatible con Vagrant y Linux manual)
+if [ -f "/vagrant/app-para-tu-github/Dockerfile" ]; then
+    DOCKERFILE_PATH="/vagrant/app-para-tu-github/Dockerfile"
+else
+    DOCKERFILE_PATH="../app-para-tu-github/Dockerfile"
+fi
+
+# Construir v1 (sin --build-arg, VERSION por defecto es v1)
+echo "Construyendo imagen playground:v1..."
+docker build -t playground:v1 -f "$DOCKERFILE_PATH" "$(dirname "$DOCKERFILE_PATH")"
+
+# Construir v2 (con --build-arg VERSION=v2)
+echo "Construyendo imagen playground:v2..."
+docker build --build-arg VERSION=v2 -t playground:v2 -f "$DOCKERFILE_PATH" "$(dirname "$DOCKERFILE_PATH")"
+
+# Subirlas a K3d (hacerlas disponibles en la VM)
+echo "Inyectando imágenes en K3d..."
+k3d image import playground:v1 -c iot-cluster
+k3d image import playground:v2 -c iot-cluster
+
+echo "Imágenes locales construidas exitosamente."
+
+echo "========================================================="
 echo " Configurando App Local con Argo CD..."
 echo "========================================================="
 # Soporte dual: Vagrant (/vagrant) o Linux Manual (..)
