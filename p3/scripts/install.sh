@@ -49,6 +49,12 @@ echo "Esperando que los pods de ArgoCD se levanten (esto puede tardar 1 o 2 minu
 sleep 15
 kubectl wait --for=condition=Ready pods --all -n argocd --timeout=300s
 
+# Argo CD fuerza HTTPS por defecto. Para servirlo detrás del puerto 8080 local,
+# lo ponemos en modo insecure para que no redirija a https://localhost:8080.
+kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"server.insecure":"true"}}'
+kubectl rollout restart deployment/argocd-server -n argocd
+kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
+
 # Configuramos Argo CD para que se exponga sin SSL y poder entrar por puerto 8080 localmente.
 # En lugar de Ingress complejo, hacemos un Ingress muy básico hacia argo-server
 cat <<EOF | kubectl apply -n argocd -f -
@@ -60,6 +66,7 @@ metadata:
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
 spec:
+  ingressClassName: traefik
   rules:
   - http:
       paths:
