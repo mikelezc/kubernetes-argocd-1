@@ -14,9 +14,10 @@ if ! command -v docker &> /dev/null; then
     newgrp docker
 fi
 
-# Instalamos kubectl si no está
+# Instalamos kubectl cross-platform
 if ! command -v kubectl &> /dev/null; then
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    ARCH=$(dpkg --print-architecture)
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
     sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 fi
 
@@ -74,8 +75,12 @@ EOF
 echo "========================================================="
 echo " Configurando App Local con Argo CD..."
 echo "========================================================="
-# Nota: debes estar en p3/scripts para que esto funcione
-kubectl apply -f ../confs/argocd.yaml
+# Soporte dual: Vagrant (/vagrant) o Linux Manual (..)
+if [ -f "/vagrant/confs/argocd.yaml" ]; then
+    kubectl apply -f /vagrant/confs/argocd.yaml
+else
+    kubectl apply -f ../confs/argocd.yaml
+fi
 
 echo "========================================================="
 echo " ¡INSTALACIÓN COMPLETADA! "

@@ -2,6 +2,30 @@
 # scripts/install.sh (Bonus)
 
 echo "========================================================="
+echo " Preparando la VM e Instalando utilidades base..."
+echo "========================================================="
+
+# Instalamos Docker si no está
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    newgrp docker
+fi
+
+# Instalamos kubectl cross-platform
+if ! command -v kubectl &> /dev/null; then
+    ARCH=$(dpkg --print-architecture)
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+fi
+
+# Instalamos K3d
+if ! command -v k3d &> /dev/null; then
+    curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+fi
+
+echo "========================================================="
 echo " Instalando Helm, GitLab y Argo CD..."
 echo "========================================================="
 
@@ -26,10 +50,17 @@ kubectl create namespace dev
 
 echo "Instalando GitLab via Helm. Esto tomará MUCHO TIEMPO..."
 # Usamos un despliegue minimalista pensado para evitar que los ordenadores exploten
+# Soporte dual: Vagrant (/vagrant) o Linux Manual (..)
+if [ -f "/vagrant/confs/gitlab-values.yaml" ]; then
+    VALUES_PATH="/vagrant/confs/gitlab-values.yaml"
+else
+    VALUES_PATH="../confs/gitlab-values.yaml"
+fi
+
 helm upgrade --install gitlab gitlab/gitlab \
   --timeout 600s \
   --namespace gitlab \
-  -f ../confs/gitlab-values.yaml
+  -f $VALUES_PATH
 
 echo "Instalando Argo CD..."
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml

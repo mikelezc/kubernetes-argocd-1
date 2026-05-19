@@ -26,7 +26,7 @@ Al igual que en las fases anteriores, hemos introducido un **Vagrantfile automat
 > *Nota: Esta es la VM más grande. Tarda unos 5-10 minutos en levantar completamente porque descargar y descomprimir todos los contenedores de GitLab toma su tiempo.*
 
 ## 🎯 Probarlo y jugar 
-1. **Acceder a GitLab Local:** Navegarás hacia donde hayas apuntado la IP de K3d (típicamente `http://localhost` o configurando `/etc/hosts` para `gitlab.local`).
+1. **Acceder a GitLab Local:** Navegarás a `http://gitlab.local` (tendremos que mapearlo en el `/etc/hosts` de tu Mac hacia la IP virtual `192.168.56.110` en vez de 127.0.0.1).
 2. **Simular Día a Día:** Al igual que en la Parte 3, crearás un repositorio, pero esta vez dentro de este GitLab que tienes alojado tú mismo.
 3. Subirás el código de tu web, apuntarás el `argocd.yaml` a la URL de este repo interno, y observarás cómo las actualizaciones viajan desde tu base de datos interna directamente al publicador en vivo. ¡El círculo cerrado empresarial perfecto!
 

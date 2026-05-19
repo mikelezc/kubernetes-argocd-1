@@ -8,9 +8,9 @@ spec:
   project: default
   source:
     # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
-    # CAMBIA LA URL DE ABAJO POR EL REPO DE GITHUB QUE HAZ CREADO
+    # CAMBIA LA URL DE ABAJO POR EL REPO DE GITHUB QUE HA CREADO
     # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
-    repoURL: 'https://github.com/TU_USUARIO/TU_REPOSITORIO.git'
+    repoURL: 'https://github.com/mikelezc/miguel-iot-argocd'
     # Esta es la rama, si tu repo crea "main" por defecto, pon main, si no, dejalo en master.
     targetRevision: HEAD
     # Dejamos la ruta (.) para que escanee la base de tu repo buscando el deployment.yaml
