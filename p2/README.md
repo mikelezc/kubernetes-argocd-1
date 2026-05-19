@@ -65,21 +65,38 @@ Ahora ya puedes abrir tu navegador y visitar:
 ## Comandos Útiles de Kubernetes
 Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh miguelS`) y probar:
 
-- **Ver el Ingress y las rutas**:
-  ```bash
-  kubectl get ingress
-  ```
-- **Ver los Deployments y Réplicas**:
-  ```bash
-  kubectl get deploy
-  ```
-- **Ver todos los Pods**:
-  ```bash
-  kubectl get pods
-  ```
+1. **Ver el Ingress y las rutas**:
+   ```bash
+   kubectl get ingress
+   ```
+   **Lo que verás**:
+   ```
+   NAME          CLASS    HOSTS               ADDRESS          PORTS
+   iot-ingress   <none>   app1.com,app2.com   192.168.56.110   80
+   ```
+   *¿Por qué no aparece app3.com?* Es el misterio mejor guardado: `app3.com` **NO** existe lógicamente en nuestro archivo. Lo que nosotros le hemos dicho a Kubernetes es "Las peticiones para app1 se van a la ruta 1, las de app2 a la ruta 2 y... **TODO lo demás (sin importar el nombre)** mételo hacia la ruta 3". Como la regla 3 es un "comodín vacío" (`*` o *cláusula por defecto*), Kubernetes sólo te enlista los dominios fijos en la columna `HOSTS`.
+
+2. **Ver los Deployments y Réplicas**:
+   ```bash
+   kubectl get deploy
+   ```
+   **Lo que verás**:
+   ```
+   NAME   READY   UP-TO-DATE   AVAILABLE
+   app1   1/1     1            1
+   app2   3/3     3            3
+   app3   1/1     1            1
+   ```
+   *Observación clave*: Fíjate cómo la columna `READY` de `app2` dice **3/3**. Esto confirma visualmente que le dimos la orden al *Deployment* de crear 3 réplicas idénticas (escalabilidad real).
+
+3. **Ver todos los Pods**:
+   ```bash
+   kubectl get pods
+   ```
+   **Lo que verás**: Una lista con los nombres físicos reales (largos e irrepetibles como `app2-59787df8c8-hjjdm`) de tus pequeños mini-servidores. Verás que hay exactamente 1 de app1, 3 de app2 y 1 de app3 funcionando en aislamiento absoluto.
 
 ## Limpieza y Destrucción
-Al igual que en p1, no dejes las máquinas consumiendo RAM en tu sistema.
+Al igual que en p1, es importante apagar las máquinas para no consumir RAM en tu sistema al finalizar la práctica.
 ```bash
 vagrant destroy -f
 ```
