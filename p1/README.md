@@ -1,6 +1,6 @@
 # Parte 1: K3s y Vagrant
 
-## 🧠 ¿Qué es esto y por qué lo usamos? (Enfoque Pedagógico)
+## ¿Qué es esto y por qué lo usamos?
 El objetivo de este proyecto es tener nuestro primer contacto real con **Kubernetes (K8s)**, el sistema estándar en la industria para orquestar contenedores. Dado que Kubernetes estándar consume muchísimos recursos para ser montado de cero de forma local, utilizamos **K3s**.
 
 **K3s** es una distribución certificada de Kubernetes creada por *Rancher* diseñada para ser extremadamente ligera (ocupa menos de 100MB). Es ideal para despliegues IoT (Internet of Things), Edge computing y formación como en nuestro caso.
