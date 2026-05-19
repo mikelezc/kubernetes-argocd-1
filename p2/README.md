@@ -39,7 +39,7 @@ curl -H "Host: meloinvento.test" http://192.168.56.110
 ```
 
 ## Comandos Útiles de Kubernetes
-Si necesitas enseñarle las entrañas al evaluador, debes entrar por SSH (`vagrant ssh miguelS`) y probar:
+Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh miguelS`) y probar:
 
 - **Ver el Ingress y las rutas**:
   ```bash
