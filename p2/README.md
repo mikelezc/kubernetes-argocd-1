@@ -69,11 +69,11 @@ Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh miguelS`
   ```bash
   kubectl get ingress
   ```
-- **Ver los Deployments y Réplicas (¡Mira cuántas hay de app2!)**:
+- **Ver los Deployments y Réplicas**:
   ```bash
   kubectl get deploy
   ```
-- **Ver todos los Pods (Contenedores físicos finales)**:
+- **Ver todos los Pods**:
   ```bash
   kubectl get pods
   ```
