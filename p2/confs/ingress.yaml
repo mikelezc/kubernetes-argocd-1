@@ -4,15 +4,8 @@ kind: Ingress
 metadata:
   name: iot-ingress
 spec:
-  # Por defecto, si el Ingress recibe una conexión de un host distinto (o no lo conoce)
-  # lo mandará a la app3. Esto es el "Otherwise, app3 will be selected by default".
-  defaultBackend:
-    service:
-      name: app3
-      port:
-        number: 80
-  # Y aquí las reglas explícitas para app1 y app2:
   rules:
+  # Reglas explícitas para app1
   - host: app1.com
     http:
       paths:
@@ -23,6 +16,7 @@ spec:
             name: app1
             port:
               number: 80
+  # Reglas explícitas para app2
   - host: app2.com
     http:
       paths:
@@ -31,5 +25,16 @@ spec:
         backend:
           service:
             name: app2
+            port:
+              number: 80
+  # El "Otherwise, app3 will be selected by default".
+  # Al no poner 'host', Traefik entiende que esto es el comodín (*) para todo el tráfico no coincidente.
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app3
             port:
               number: 80
