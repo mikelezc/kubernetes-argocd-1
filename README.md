@@ -1,6 +1,6 @@
 # Inception of Things - Proyecto Explicado 🚀
 
-¡Hola! Este repositorio contiene la solución completa para el proyecto **Inception of Things (IoT)**, estructurado y documentado para que alguien que no ha tocado estas tecnologías (Vagrant, Kubernetes, K3s, K3d, ArgoCD) lo entienda paso a paso.
+Este repositorio contiene la solución completa para el proyecto **Inception of Things (IoT)**, estructurado y documentado para que alguien que no ha tocado estas tecnologías (Vagrant, Kubernetes, K3s, K3d, ArgoCD) lo entienda paso a paso.
 
 ## 🛠 Atento a tu Mac (Apple Silicon M4 Pro)
 El "Subject" original habla de usar Vagrant y (normalmente implican) VirtualBox. **VirtualBox no funciona en los nuevos Mac con chips M (M1, M2, M3, M4)** de forma nativa/rendimiento decente.
