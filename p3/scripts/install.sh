@@ -143,3 +143,6 @@ echo "Usuario: admin"
 SECRET=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
 echo "Contraseña: $SECRET"
 echo "========================================================="
+echo "Para entrar en la web de la app (después de hacer deploy con Argo CD):"
+echo "URL: http://localhost:8888"
+echo "========================================================="
