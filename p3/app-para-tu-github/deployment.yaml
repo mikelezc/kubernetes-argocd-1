@@ -18,7 +18,8 @@ spec:
     spec:
       containers:
       - name: wil-playground
-        image: wil42/playground:v1 # <--- Este es el tag que tendrás que cambiar a v2 luego en tu Github!
+        image: playground:v1 # Imagen local construida en install.sh (cambiar a v2)
+        imagePullPolicy: Never # No descargar de Docker Hub, usar local
         ports:
         - containerPort: 8888
 ---
@@ -28,26 +29,10 @@ metadata:
   name: wil-playground
   namespace: dev
 spec:
+  type: NodePort
   ports:
   - port: 8888
     targetPort: 8888
+    nodePort: 30080
   selector:
     app: playground
----
-# Ingress para poder entrar a la app por localhost:8888 en nuestra máquina
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: playground-ingress
-  namespace: dev
-spec:
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: wil-playground
-            port:
-              number: 8888
