@@ -29,27 +29,10 @@ metadata:
   name: wil-playground
   namespace: dev
 spec:
+  type: NodePort
   ports:
   - port: 8888
     targetPort: 8888
+    nodePort: 30080
   selector:
     app: playground
----
-# Ingress para poder entrar a la app por localhost:8888 en nuestra máquina
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: playground-ingress
-  namespace: dev
-spec:
-  ingressClassName: traefik
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: wil-playground
-            port:
-              number: 8888

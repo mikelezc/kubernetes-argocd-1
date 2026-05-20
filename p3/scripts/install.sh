@@ -32,9 +32,9 @@ echo "========================================================="
 # Borramos el cluster si ya existía de pruebas anteriores
 k3d cluster delete iot-cluster || true
 
-# Creamos el cluster exponiendo el puerto 8888 para la aplicación y 
-# el puerto 8080 para la interfaz de Argo CD
-k3d cluster create iot-cluster --api-port 6550 -p "8080:80@loadbalancer" -p "8888:80@loadbalancer"
+# Creamos el cluster exponiendo el puerto 8080 (Traefik/Argo CD)
+# y el puerto 8888 directo al NodePort 30080 de la app playground.
+k3d cluster create iot-cluster --api-port 6550 -p "8080:80@loadbalancer" -p "8888:30080@server:0"
 
 echo "========================================================="
 echo " Configurando CoreDNS para usar resolvers públicos..."
@@ -74,7 +74,7 @@ kubectl rollout restart deployment/argocd-server -n argocd
 kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
 # Configuramos Argo CD para que se exponga sin SSL y poder entrar por puerto 8080 localmente.
-# Creamos un Ingress que responde SOLO a argocd.localhost para evitar conflictos.
+# Forzamos Argo CD a usar el entrypoint `web` para que Traefik lo sirva desde el puerto 80.
 cat <<EOF | kubectl apply -n argocd -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -83,11 +83,11 @@ metadata:
   namespace: argocd
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
   rules:
-  - host: argocd.localhost
-    http:
+  - http:
       paths:
       - path: /
         pathType: Prefix
@@ -97,6 +97,9 @@ spec:
             port:
               name: http
 EOF
+
+# No usamos entrypoint extra en Traefik para la app.
+# La app sale por NodePort fijo (30080) y k3d lo mapea a localhost:8888.
 
 echo "========================================================="
 echo " Construyendo Imágenes Docker Locales (v1 y v2)..."
