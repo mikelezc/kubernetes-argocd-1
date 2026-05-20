@@ -34,4 +34,4 @@ done
 # Así, el worker podrá leer el archivo `/vagrant/node-token` cuando despierte.
 cp /var/lib/rancher/k3s/server/node-token /vagrant/node-token
 
-echo "¡Instalación del Server k3s Completada!"
+echo "Instalación del Server k3s Completada!"
