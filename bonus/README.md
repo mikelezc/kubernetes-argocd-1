@@ -27,12 +27,7 @@ El script, sin que tú intercedas, instalará:
 > *Nota: Esta es la VM más grande. Tarda unos 5-10 minutos en levantar completamente porque descargar y descomprimir todos los contenedores de GitLab toma su tiempo.*
 
 ### Paso 2: Aplicar Parches Post-Install (Automático)
-Tras `vagrant up`, ejecuta el script de post-instalaación para parchear ingress y crear buckets:
-```bash
-vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'
-```
-
-Si prefieres hacerlo manualmente, lee [**FIXES.md**](./FIXES.md) para entender qué problemas se resolvieron y cómo.
+`vagrant up` ya ejecuta automáticamente el post-install después de desplegar GitLab, así que no hace falta lanzar ningún comando extra. Si quieres entender qué hace cada parche, lee [**FIXES.md**](./FIXES.md).
 
 ### Paso 3: Configurar Host y Acceder
 En **tu Mac** (host), añade la VM a `/etc/hosts`:

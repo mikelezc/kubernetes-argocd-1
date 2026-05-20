@@ -2,13 +2,14 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MAGIA CROSS-PLATFORM (ESCUELA vs MAC M4)
   # ==========================================
-  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
-    config.vm.box = "bento/ubuntu-22.04"
-    provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
-  else
-    config.vm.box = "bento/ubuntu-22.04"
-    provider = "virtualbox"
+  is_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+  provider = ENV['VAGRANT_DEFAULT_PROVIDER']
+
+  if provider.nil? || provider.empty?
+    provider = is_arm ? "vmware_desktop" : "virtualbox"
   end
+
+  config.vm.box = "bento/ubuntu-22.04"
 
   # ==========================================
   # CONFIGURACIÓN BONUS (GitLab asfixia la RAM)
@@ -44,5 +45,6 @@ Vagrant.configure("2") do |config|
     
     # En bonus el script de install debe instalar Docker, K3d, GitLab y ArgoCD.
     server.vm.provision "shell", path: "scripts/install.sh", privileged: true
+    server.vm.provision "shell", path: "scripts/post-install.sh", privileged: true
   end
 end

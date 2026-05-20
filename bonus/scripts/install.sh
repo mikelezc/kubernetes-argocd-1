@@ -1,9 +1,18 @@
 #!/bin/bash
 # scripts/install.sh (Bonus)
 
+set -e
+
+progress_step() {
+    echo ""
+    echo "[$1] $2"
+}
+
 echo "========================================================="
 echo " Preparando la VM e Instalando utilidades base..."
 echo "========================================================="
+
+progress_step "1/6" "Instalando Docker, kubectl y k3d"
 
 # Instalamos Docker si no está
 if ! command -v docker &> /dev/null; then
@@ -29,10 +38,14 @@ echo "========================================================="
 echo " Instalando Helm, GitLab y Argo CD..."
 echo "========================================================="
 
+progress_step "2/6" "Instalando Helm"
+
 # Instalamos helm si no lo tienes
 if ! command -v helm &> /dev/null; then
     curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | sudo bash
 fi
+
+progress_step "3/6" "Creando el cluster k3d iot-bonus"
 
 # Creamos el cluster k3d
 k3d cluster delete iot-bonus || true
@@ -44,16 +57,19 @@ mkdir -p /home/vagrant/.kube
 k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
 
+progress_step "4/6" "Añadiendo el repo de GitLab y namespaces"
+
 # Añadir repositorio de GitLab
 helm repo add gitlab https://charts.gitlab.io/
 helm repo update
 
 # Crear namespace
-kubectl create namespace gitlab
-kubectl create namespace argocd
-kubectl create namespace dev
+kubectl create namespace gitlab 2>/dev/null || true
+kubectl create namespace argocd 2>/dev/null || true
+kubectl create namespace dev 2>/dev/null || true
 
 echo "Instalando GitLab via Helm. Esto tomará MUCHO TIEMPO..."
+progress_step "5/6" "Desplegando GitLab con Helm"
 # Usamos un despliegue minimalista pensado para evitar que los ordenadores exploten
 # Soporte dual: Vagrant (/vagrant) o Linux Manual (..)
 if [ -f "/vagrant/confs/gitlab-values.yaml" ]; then
@@ -69,6 +85,8 @@ if ! helm upgrade --install gitlab gitlab/gitlab \
     echo "Error: GitLab no se pudo instalar con Helm. Revisa el mensaje anterior y el values.yaml."
     exit 1
 fi
+
+progress_step "6/6" "Desplegando Argo CD"
 
 echo "Instalando Argo CD..."
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml

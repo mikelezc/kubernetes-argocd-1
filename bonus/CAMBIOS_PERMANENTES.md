@@ -33,7 +33,8 @@ gitlab:
 ### 3. Post-Install Script (Nuevo)
 - Parchea ingress a clase `traefik`
 - Crea buckets MinIO automáticamente
-- Ejecutable con: `vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'`
+- Se ejecuta automáticamente desde `bonus/Vagrantfile` después de `scripts/install.sh`
+- Fallback manual: `vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'`
 
 ## Validación Final
 
@@ -49,8 +50,7 @@ gitlab:
 cd bonus
 vagrant up --provider=vmware_desktop
 
-# Esperar a que termine, luego:
-vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'
+# Esperar a que termine; el post-install ya se ejecuta solo
 
 # Desde el host:
 echo "192.168.56.110 gitlab.local" | sudo tee -a /etc/hosts

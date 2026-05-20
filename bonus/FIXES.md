@@ -100,14 +100,11 @@ Este documento lista las correcciones y ajustes realizados para que GitLab + Arg
    - Instala Docker, k3d, Helm, GitLab y ArgoCD
    - Crea el cluster k3d `iot-bonus` con puertos correctos
 
-3. **Post-install (si falla automáticamente, ver más abajo):**
+3. **Post-install automático:**
+   - `vagrant up` ejecuta también `scripts/post-install.sh` mediante un segundo provisioner.
+   - Si necesitas repetirlo manualmente por diagnóstico, puedes usar:
    ```bash
-   vagrant ssh
-   
-   # Parchear ingress a class traefik
-   kubectl -n gitlab patch ingress gitlab-webservice-default --type=merge -p '{"spec":{"ingressClassName":"traefik"}}'
-   kubectl -n gitlab patch ingress gitlab-kas --type=merge -p '{"spec":{"ingressClassName":"traefik"}}'
-   kubectl -n gitlab patch ingress gitlab-minio --type=merge -p '{"spec":{"ingressClassName":"traefik"}}'
+   vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'
    ```
 
 4. **Acceder a GitLab:**
