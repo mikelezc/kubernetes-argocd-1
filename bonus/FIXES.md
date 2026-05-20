@@ -110,7 +110,7 @@ Este documento lista las correcciones y ajustes realizados para que GitLab + Arg
 4. **Acceder a GitLab:**
    - Añadir a `/etc/hosts` (en el host):
      ```
-     192.168.56.110 gitlab.local
+   192.168.56.111 gitlab.local
      ```
    - Abrir navegador: `http://gitlab.local`
 

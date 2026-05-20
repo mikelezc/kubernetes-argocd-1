@@ -58,7 +58,7 @@ echo "✓ Ingress parcheados a traefik"
 echo "✓ MinIO buckets creados"
 echo ""
 echo "Próximos pasos:"
-echo "1. Añade a /etc/hosts (en tu host): 192.168.56.110 gitlab.local"
+echo "1. Añade a /etc/hosts (en tu host): 192.168.56.111 gitlab.local"
 echo "2. Abre http://gitlab.local en el navegador"
 echo ""
 

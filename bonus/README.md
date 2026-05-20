@@ -20,7 +20,7 @@ vagrant up --provider=vmware_desktop  # O virtualbox si usas Linux
 
 El script, sin que tú intercedas, instalará:
 - Docker y K3d.
-- El clúster `iot-bonus` vinculando puertos locales (8888 para la App, 80 para Gitlab).
+- El clúster `iot-bonus` con GitLab expuesto por ingress en `gitlab.local`.
 - GitLab minimalista usando Helm.
 - Argo CD y los despliegues pertinentes.
 
@@ -32,13 +32,13 @@ El script, sin que tú intercedas, instalará:
 ### Paso 3: Configurar Host y Acceder
 En **tu Mac** (host), añade la VM a `/etc/hosts`:
 ```bash
-echo "192.168.56.110 gitlab.local" | sudo tee -a /etc/hosts
+echo "192.168.56.111 gitlab.local" | sudo tee -a /etc/hosts
 ```
 
 Abre el navegador a **http://gitlab.local**. Deberías ver el login de GitLab.
 
 ## Probarlo y jugar 
-1. **Acceder a GitLab Local:** Navegarás a `http://gitlab.local` (tendremos que mapearlo en el `/etc/hosts` de tu Mac hacia la IP virtual `192.168.56.110` en vez de 127.0.0.1).
+1. **Acceder a GitLab Local:** Navegarás a `http://gitlab.local` (tendremos que mapearlo en el `/etc/hosts` de tu Mac hacia la IP virtual `192.168.56.111` en vez de 127.0.0.1).
 2. **Simular Día a Día:** Al igual que en la Parte 3, crearás un repositorio, pero esta vez dentro de este GitLab que tienes alojado tú mismo.
 3. Subirás el código de tu web, apuntarás el `argocd.yaml` a la URL de este repo interno, y observarás cómo las actualizaciones viajan desde tu base de datos interna directamente al publicador en vivo. ¡El círculo cerrado empresarial perfecto!
 
