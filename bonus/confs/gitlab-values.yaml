@@ -3,10 +3,11 @@
 global:
   edition: ce
   hosts:
-    domain: example.com
+    domain: local
     https: false
-certmanager:
-  install: false
+installCertmanager: false
+certmanager-issuer:
+  email: admin@gitlab.local
 nginx-ingress:
   enabled: false
 prometheus:
@@ -23,5 +24,16 @@ gitlab:
   gitlab-shell:
     minReplicas: 1
     maxReplicas: 1
+  minio:
+    image:
+      repository: minio/minio
+      tag: latest
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
 registry:
   enabled: false

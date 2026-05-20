@@ -39,6 +39,11 @@ k3d cluster delete iot-bonus || true
 # Importante: añadimos puertos extras para gitlab (80, 443, 22)
 k3d cluster create iot-bonus --api-port 6550 -p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "8080:8080@loadbalancer" -p "8888:8888@loadbalancer"
 
+# Dejamos el kubeconfig disponible para futuras sesiones de vagrant ssh
+mkdir -p /home/vagrant/.kube
+k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
+chown -R vagrant:vagrant /home/vagrant/.kube
+
 # Añadir repositorio de GitLab
 helm repo add gitlab https://charts.gitlab.io/
 helm repo update
@@ -57,14 +62,30 @@ else
     VALUES_PATH="../confs/gitlab-values.yaml"
 fi
 
-helm upgrade --install gitlab gitlab/gitlab \
-  --timeout 600s \
-  --namespace gitlab \
-  -f $VALUES_PATH
+if ! helm upgrade --install gitlab gitlab/gitlab \
+    --timeout 600s \
+    --namespace gitlab \
+    -f "$VALUES_PATH"; then
+    echo "Error: GitLab no se pudo instalar con Helm. Revisa el mensaje anterior y el values.yaml."
+    exit 1
+fi
 
 echo "Instalando Argo CD..."
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
 
 echo "¡Instalación base completada!"
-echo "Ten en cuenta que los pods de GitLab tardan mucho en mostrarse Ready."
-echo "Usa: kubectl get pods -n gitlab -w"
+echo ""
+echo "========================================================="
+echo " GUIA RAPIDA DE USO"
+echo "========================================================="
+echo "1) Asegura este mapeo en tu Mac: 192.168.56.110 gitlab.local"
+echo "2) Abre GitLab en: http://gitlab.local"
+echo "3) Comprueba el estado de los pods con: kubectl get pods -n gitlab -w"
+echo "4) Comprueba Argo CD con: kubectl get pods -n argocd -w"
+echo "5) Si la UI no responde aun, espera a que GitLab pase a Ready; tarda bastante"
+echo "6) La app de ejemplo queda expuesta en: http://localhost:8888"
+echo ""
+echo "Comandos utiles dentro de la VM:"
+echo "- kubectl get pods -A"
+echo "- kubectl get svc -n gitlab"
+echo "- kubectl logs -n gitlab -l app=webservice --tail=50"

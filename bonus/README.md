@@ -11,19 +11,36 @@ El Bonus lleva el ecosistema GitOps a su expresión máxima de seguridad y priva
 
 ## ¿Cómo levantar todo el ecosistema?
 Al igual que en las fases anteriores, hemos introducido un **Vagrantfile automatizado Multi-Arquitectura** aquí también.
-1. Abre tu terminal.
-2. Entra en esta carpeta (`cd bonus`).
-3. Lánzalo ejecutando:
-   ```bash
-   vagrant up
-   ```
-4. El script, sin que tú intercedas, instalará:
-   - Docker y K3d.
-   - El clúster `iot-cluster` vinculando puertos locales (8888 para la App, 80 para Gitlab).
-   - GitLab minimalista usando Helm.
-   - Argo CD y los despliegues pertinentes.
+
+### Paso 1: Levantar la VM
+```bash
+cd bonus
+vagrant up --provider=vmware_desktop  # O virtualbox si usas Linux
+```
+
+El script, sin que tú intercedas, instalará:
+- Docker y K3d.
+- El clúster `iot-bonus` vinculando puertos locales (8888 para la App, 80 para Gitlab).
+- GitLab minimalista usando Helm.
+- Argo CD y los despliegues pertinentes.
 
 > *Nota: Esta es la VM más grande. Tarda unos 5-10 minutos en levantar completamente porque descargar y descomprimir todos los contenedores de GitLab toma su tiempo.*
+
+### Paso 2: Aplicar Parches Post-Install (Automático)
+Tras `vagrant up`, ejecuta el script de post-instalaación para parchear ingress y crear buckets:
+```bash
+vagrant ssh -c 'bash /vagrant/scripts/post-install.sh'
+```
+
+Si prefieres hacerlo manualmente, lee [**FIXES.md**](./FIXES.md) para entender qué problemas se resolvieron y cómo.
+
+### Paso 3: Configurar Host y Acceder
+En **tu Mac** (host), añade la VM a `/etc/hosts`:
+```bash
+echo "192.168.56.110 gitlab.local" | sudo tee -a /etc/hosts
+```
+
+Abre el navegador a **http://gitlab.local**. Deberías ver el login de GitLab.
 
 ## Probarlo y jugar 
 1. **Acceder a GitLab Local:** Navegarás a `http://gitlab.local` (tendremos que mapearlo en el `/etc/hosts` de tu Mac hacia la IP virtual `192.168.56.110` en vez de 127.0.0.1).
