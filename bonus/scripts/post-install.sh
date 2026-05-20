@@ -61,3 +61,39 @@ echo "Próximos pasos:"
 echo "1. Añade a /etc/hosts (en tu host): 192.168.56.110 gitlab.local"
 echo "2. Abre http://gitlab.local en el navegador"
 echo ""
+
+# Intentar extraer e imprimir la contraseña inicial del usuario `root`
+echo "Obteniendo contraseña inicial del usuario 'root' (si está disponible)..."
+ROOT_SECRET_NAME="gitlab-gitlab-initial-root-password"
+
+# Esperar a que el secreto esté disponible (máx 2 minutos)
+for i in $(seq 1 24); do
+  if kubectl -n gitlab get secret "$ROOT_SECRET_NAME" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+
+# Intentar extraer la contraseña
+if kubectl -n gitlab get secret "$ROOT_SECRET_NAME" >/dev/null 2>&1; then
+  ROOT_PASSWORD=$(kubectl -n gitlab get secret "$ROOT_SECRET_NAME" -o jsonpath='{.data.password}' 2>/dev/null || true)
+  if [ -n "$ROOT_PASSWORD" ]; then
+    # base64-decode
+    DECODED=$(echo "$ROOT_PASSWORD" | base64 -d 2>/dev/null || true)
+    if [ -n "$DECODED" ]; then
+      echo ""
+      echo "✓ Credenciales iniciales de GitLab:"
+      echo "  Usuario: root"
+      echo "  Contraseña: $DECODED"
+      echo ""
+    else
+      echo "⚠ Se encontró el secreto pero no se pudo decodificar."
+    fi
+  else
+    echo "⚠ El secreto existe pero la contraseña no se pudo extraer."
+  fi
+else
+  echo "⚠ El secreto con la contraseña inicial no está disponible aún."
+  echo "  Puedes obtenerlo cuando esté listo con:"
+  echo "  kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d"
+fi
