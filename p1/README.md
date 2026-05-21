@@ -14,13 +14,62 @@ Arquitectura de nuestro clúster:
 - **Máquina 2 (Worker)**: Hostname `miguelSW`, IP: `192.168.56.111`.
 - K3s en modo *controller* en el Server, K3s en modo *agent* en el Worker.
 
+## Checklist de verificación del Subject
+Si quieres comprobar que esta parte está bien antes de enseñar la demo, revisa esto paso a paso:
+
+1. **Confirmar que existen las dos máquinas**
+  - En `p1/` ejecuta `vagrant up`.
+  - Luego comprueba que Vagrant ha levantado `miguelS` y `miguelSW`.
+
+2. **Verificar que el Server y el Worker tienen los nombres correctos**
+  - Entra al Server con `vagrant ssh miguelS`.
+  - Ejecuta `hostname` o `hostnamectl`.
+  - Debe responder `miguelS`.
+  - Si entras al Worker con `vagrant ssh miguelSW`, debe responder `miguelSW`.
+
+3. **Verificar la interfaz de red `eth1` y sus IPs**
+  - En cada máquina ejecuta `ip addr show eth1`.
+  - En el Server debe aparecer `192.168.56.110`.
+  - En el Worker debe aparecer `192.168.56.111`.
+  - Esta es la comprobación más importante de red para el evaluador.
+
+4. **Verificar que K3s está instalado y funcionando**
+  - Entra en el Server, porque ahí vive el control-plane. `vagrant ssh miguelS`
+  - Ejecuta `kubectl cluster-info`.
+  - Debes ver que el control plane, CoreDNS y metrics-server están accesibles desde la API de K3s.
+
+5. **Verificar que ambos nodos están en el mismo clúster**
+  - Desde el Server ejecuta `kubectl get nodes -o wide`.
+  - Deben aparecer `miguelS` y `miguelSW`.
+  - Ambos deben estar en estado `Ready`.
+
+6. **Verificar que los pods del sistema están arriba**
+  - Ejecuta `kubectl get pods -n kube-system`.
+  - Debes ver pods como CoreDNS, metrics-server, flannel o los componentes que use tu instalación de K3s.
+
+**Explicación de los diferentes PODS del cluster:**
+
+    - `coredns-...`: servicio DNS interno del clúster. Permite resolver nombres de servicios y pods.
+    - `helm-install-traefik-...` y `helm-install-traefik-crd-...`: tareas temporales de instalación que K3s usa para desplegar Traefik y sus CRDs. Que aparezcan como `Completed` es normal.
+    - `local-path-provisioner-...`: provisión de almacenamiento local. Crea volúmenes persistentes simples sobre el disco de la VM.
+    - `metrics-server-...`: recoge métricas básicas de CPU y memoria para el clúster.
+    - `svclb-traefik-...`: balanceadores de servicio creados por K3s para exponer Traefik hacia fuera.
+    - `traefik-...`: el ingress controller por defecto de K3s, encargado de enrutar tráfico HTTP/HTTPS hacia los servicios correctos.
+
+7. **Entender el 401 de la URL del metrics-server**
+  - Si abres en el navegador la URL que devuelve `kubectl cluster-info`, como `https://192.168.56.110:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy`, es normal que salga `Unauthorized`.
+  - Esa URL es un endpoint de la API de Kubernetes, no una página web pública.
+  - El navegador no lleva las credenciales/certificados de `kubectl`, así que la respuesta 401 significa que el clúster está protegiendo correctamente el acceso.
+
 ## ¿Cómo levantar el Clúster?
 1.Abrimos la terminal y vamos a la carpeta (`cd p1`).
+
 2.Ejecutamos Vagrant para levantar ambas máquinas:
   ```bash
   vagrant up
   ```
-> **Planteamiento Multi-Arquitectura**: Este proyecto ha sido automatizado para detectar si el ordenador que hace el `vagrant up` es un Apple Silicon (ARM64) o un procesador x86_64 tradicional (ya que lo hemos desarrollado en un equipo con Apple silicon). Configurará dinámicamente el provider (VirtualBox, VMware o Parallels) sin tener que tocar código.
+> **Planteamiento Multi-Arquitectura**: Este proyecto ha sido automatizado para detectar si el ordenador que hace el `vagrant up` es un Apple Silicon (ARM64) o un procesador x86_64 tradicional (ya que lo hemos desarrollado en un equipo con Apple silicon). 
+Configurará dinámicamente el provider (VirtualBox, VMware o Parallels) sin tener que tocar código.
 
 ## Comandos de uso
 
