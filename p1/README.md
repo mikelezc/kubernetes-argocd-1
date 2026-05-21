@@ -10,11 +10,13 @@ Arquitectura de nuestro clúster:
 - **Worker (Agent)**: Son los nodos de trabajo que realizarán las tareas (en este ejemplo es un solo nodo). No toma decisiones, simplemente obedece al Server y ejecuta los contenedores (Pods) que el Server le asigne. A estos contenedores les da conectividad de red interna.
 
 ## Requisitos de la Práctica (Subject)
+
 - **Máquina 1 (Server)**: Hostname `miguelS`, IP: `192.168.56.110`.
 - **Máquina 2 (Worker)**: Hostname `miguelSW`, IP: `192.168.56.111`.
 - K3s en modo *controller* en el Server, K3s en modo *agent* en el Worker.
 
-## Checklist de verificación del Subject
+## Checklist de verificación del cluster
+
 Si quieres comprobar que esta parte está bien antes de enseñar la demo, revisa esto paso a paso:
 
 1. **Confirmar que existen las dos máquinas**
@@ -61,17 +63,14 @@ Si quieres comprobar que esta parte está bien antes de enseñar la demo, revisa
   - Esa URL es un endpoint de la API de Kubernetes, no una página web pública.
   - El navegador no lleva las credenciales/certificados de `kubectl`, así que la respuesta 401 significa que el clúster está protegiendo correctamente el acceso.
 
-## ¿Cómo levantar el Clúster?
-1.Abrimos la terminal y vamos a la carpeta (`cd p1`).
+## Comandos de uso
 
-2.Ejecutamos Vagrant para levantar ambas máquinas:
+
+Ejecutamos Vagrant para levantar ambas máquinas:
+
   ```bash
   vagrant up
   ```
-> **Planteamiento Multi-Arquitectura**: Este proyecto ha sido automatizado para detectar si el ordenador que hace el `vagrant up` es un Apple Silicon (ARM64) o un procesador x86_64 tradicional (ya que lo hemos desarrollado en un equipo con Apple silicon). 
-Configurará dinámicamente el provider (VirtualBox, VMware o Parallels) sin tener que tocar código.
-
-## Comandos de uso
 
 Como el clúster existe **dentro** de las máquinas virtuales, primero debes entrar al servidor (que es donde reside el control-plane y `kubectl`):
 
@@ -119,4 +118,4 @@ Es fundamental saber cómo desmantelar todo para evitar que consuma recursos en 
   ```bash
   vagrant destroy -f
   ```
-  *(Borra opcionalmente el token local generado con `rm node-token`)*
+  *(Podemos borrar opcionalmente el token local generado con `rm node-token`)*
