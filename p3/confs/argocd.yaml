@@ -1,4 +1,5 @@
-# Esto le dice a Argo CD "oye, mírate este repo de GitHub que ahí hay cosas que quiero despegar"
+# Con este archivo le decimos a ArgoCD que tome el repo de Github que hemos creado,
+# y lo despliegue en nuestro cluster cada vez que detecte un cambio (auto sync).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -7,11 +8,10 @@ metadata:
 spec:
   project: default
   source:
-    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
-    # CAMBIA LA URL DE ABAJO POR EL REPO DE GITHUB QUE HA CREADO
-    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
+    # CAMBIAMOS LA URL DE ABAJO POR EL REPO DE GITHUB QUE HA CREADO
+    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
     repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd'
-    # Esta es la rama, si tu repo crea "main" por defecto, pon main, si no, dejalo en master.
+    # Esta es la rama, "main" por defecto, pon main, si no, dejalo en master.
     targetRevision: HEAD
     # Dejamos la ruta (.) para que escanee la base de tu repo buscando el deployment.yaml
     path: '.'
