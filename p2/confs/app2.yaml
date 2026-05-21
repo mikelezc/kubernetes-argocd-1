@@ -24,15 +24,34 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         command:
         - /bin/sh
         - -c
         args:
         - |
           cat <<EOF >/usr/share/nginx/html/index.html
-          <h1>app2</h1>
-          <p>pod: ${POD_NAME}</p>
-          <p>ip: ${POD_IP}</p>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>app2</title>
+          </head>
+          <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#fff7ed,#ffedd5);font-family:Arial,sans-serif;">
+            <main style="min-width:280px;padding:32px 36px;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.12);border-top:8px solid #ea580c;">
+              <p style="margin:0 0 6px;color:#64748b;letter-spacing:.12em;text-transform:uppercase;font-size:12px;">Kubernetes demo</p>
+              <h1 style="margin:0 0 18px;font-size:42px;line-height:1;color:#c2410c;">app2</h1>
+              <table style="border-collapse:collapse;width:100%;font-size:16px;">
+                <tr><th align="left" style="padding:6px 10px 6px 0;color:#475569;">pod</th><td style="padding:6px 0;color:#0f172a;">${POD_NAME}</td></tr>
+                <tr><th align="left" style="padding:6px 10px 6px 0;color:#475569;">ip</th><td style="padding:6px 0;color:#0f172a;">${POD_IP}</td></tr>
+                <tr><th align="left" style="padding:6px 10px 6px 0;color:#475569;">node</th><td style="padding:6px 0;color:#0f172a;">${NODE_NAME}</td></tr>
+              </table>
+            </main>
+          </body>
+          </html>
           EOF
           exec nginx -g 'daemon off;'
 ---

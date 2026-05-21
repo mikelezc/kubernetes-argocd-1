@@ -78,12 +78,14 @@ Dado que Ingress ya expone los puertos 80 hacia el exterior, podemos consultarlo
 # Probar App1
 curl -H "Host: app1.com" http://192.168.56.110
 
-# Probar App2 (Prueba varias veces para ver cómo balancea la carga entre réplicas)
-curl -s -H "Host: app2.com" http://192.168.56.110
+# Probar App2 (prueba varias veces para ver cómo balancea la carga entre réplicas)
+for i in {1..6}; do curl -s -H "Host: app2.com" http://192.168.56.110; echo; done
 
 # Probar App3 (Default genérico si el host se inventa o no coincide)
 curl -H "Host: test.test" http://192.168.56.110
 ```
+
+En las tres respuestas verás el pod, la IP y el nodo. En App2, si repites la petición varias veces, también cambia el pod que responde y se ve mejor el balanceo.
 
 ## Probarlo desde el navegador
 Para poder probarlo desde el navegador antes necesitarás modificar el archivo `/etc/hosts` de tu máquina anfitriona para que el sistema sepa que `app1.com`, `app2.com` y `app3.com` apuntan a la IP de la máquina virtual (`192.168.56.110`).
