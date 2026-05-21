@@ -1,14 +1,16 @@
 # Parte 3: K3d y Argo CD (Concepto GitOps)
 
-## Conceptos Clave
+## Conceptos Clave 
+
 El objetivo de la Parte 3 es abandonar el despliegue manual (donde alguien hace un `kubectl apply -f` o levanta los archivos a mano) y abrazar la automatización extrema y la metodología **GitOps**.
 
 1. **K3d (K3s in Docker)**: Es una herramienta que nos permite levantar un clúster K3s completo dentro de contenedores Docker. Es decir, Docker es el único requisito. Ahorra muchísimos recursos, ya que levanta el server y los workers virtualizados en la misma máquina mediante contenedores.
-2. **Argo CD y GitOps**: GitOps significa que "El repositorio de Git es la única fuente de verdad". Instalaremos **Argo CD** en nuestro clúster. Argo CD es un bot vigilante que estará mirando TODO EL RATO a nuestro repositorio público de GitHub. Si en Github escribimos que queremos que `app1` tenga la versión `v2`, Argo CD lo detecta y lo cambia automáticamente en nuestro K3s. **¡Se acabó el intervenir manualmente!**
+
+2. **Argo CD y GitOps**: GitOps significa que "El repositorio de Git es la única fuente de verdad". Instalaremos **Argo CD** en nuestro clúster. Argo CD es un bot vigilante que estará mirando TODO EL RATO a nuestro repositorio público de GitHub. Si en Github escribimos que queremos que `app1` tenga la versión `v2`, Argo CD lo detecta y lo cambia automáticamente en nuestro K3s **evitamos intervenir manualmente para hacer una pull**
 
 ## Requisitos Previos
 
-Antes de levantar la máquina, debemos conectar esto a nuestro GitHub personal:
+Antes de levantar la máquina, conectamos nuestro GitHub personal:
 
 1. **Creamos un Repo Público en GitHub**:
    - Nómbralo con tu nombre de usuario de 42, por ejemplo: `miguel-iot-argocd`.
