@@ -5,7 +5,7 @@ SERVER_IP=$1
 WORKER_IP=$2
 
 echo "========================================================="
-echo " Instalando K3S en modo AGENT en miguelSW..."
+echo " Instalando K3S en modo AGENT en mlezcanoSW..."
 echo "========================================================="
 
 # Recuperamos el TOKEN secreto que el servidor guardó en la carpeta compartida:
@@ -24,4 +24,4 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent \
   --node-ip $WORKER_IP \
   --flannel-iface eth1" sh -
 
-echo "¡Instalación del Worker Completada! Si revisas el server, verás este nuevo nodo."
+echo "Instalación del Worker Completada! SRevisa el server para ver este nuevo nodo."

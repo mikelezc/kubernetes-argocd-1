@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # MAGIA CROSS-PLATFORM (ESCUELA vs MAC M4)
+  # CONFIGURACIÓN CROSS-PLATFORM (CAMPUS 42 vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
   if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
     config.vm.box = "bento/ubuntu-22.04"
@@ -11,7 +11,7 @@ Vagrant.configure("2") do |config|
   end
 
   # ==========================================
-  # CONFIGURACIÓN (K3D + ArgoCD es pesadito)
+  # CONFIGURACIÓN (K3D + ArgoCD + RAM + CPU)
   # ==========================================
   config.vm.provider provider do |v|
     if provider == "virtualbox" || provider == "parallels"
@@ -26,8 +26,8 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MÁQUINA DE DESPLIEGUE P3
   # ==========================================
-  config.vm.define "miguelS" do |server|
-    server.vm.hostname = "miguelS"
+  config.vm.define "mlezcanoS" do |server|
+    server.vm.hostname = "mlezcanoS"
     server.vm.network "private_network", ip: "192.168.56.110"
     
     # Redirigimos el localhost de la VM al localhost del Mac para cumplir con el tutorial
@@ -35,9 +35,9 @@ Vagrant.configure("2") do |config|
     server.vm.network "forwarded_port", guest: 8080, host: 8080
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS_p3"
+        v.name = "mlezcanoS_p3"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS_p3"
+        v.vmx["displayname"] = "mlezcanoS_p3"
       end
     end
     

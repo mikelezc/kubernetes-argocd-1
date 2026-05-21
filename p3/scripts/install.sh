@@ -105,10 +105,10 @@ echo "========================================================="
 echo " Construyendo Imágenes Docker Locales (v1 y v2)..."
 echo "========================================================="
 # Obtener la ruta del Dockerfile (compatible con Vagrant y Linux manual)
-if [ -f "/vagrant/app-para-tu-github/Dockerfile" ]; then
-    DOCKERFILE_PATH="/vagrant/app-para-tu-github/Dockerfile"
+if [ -f "/vagrant/repo-github/Dockerfile" ]; then
+    DOCKERFILE_PATH="/vagrant/repo-github/Dockerfile"
 else
-    DOCKERFILE_PATH="../app-para-tu-github/Dockerfile"
+    DOCKERFILE_PATH="../repo-github/Dockerfile"
 fi
 
 # Construir v1 (sin --build-arg, VERSION por defecto es v1)

@@ -1,6 +1,3 @@
-# Copia el archivo ENTERO (junto a los guiones "---")
-# y ponlo en tu repo de Github, en un archivo llamado `deployment.yaml`
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:

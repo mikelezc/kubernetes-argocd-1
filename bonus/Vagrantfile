@@ -2,46 +2,47 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MAGIA CROSS-PLATFORM (ESCUELA vs MAC M4)
   # ==========================================
-  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
-    config.vm.box = "bento/ubuntu-22.04"
-    provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
-  else
-    config.vm.box = "bento/ubuntu-22.04"
-    provider = "virtualbox"
+  is_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+  provider = ENV['VAGRANT_DEFAULT_PROVIDER']
+
+  if provider.nil? || provider.empty?
+    provider = is_arm ? "vmware_desktop" : "virtualbox"
   end
+
+  config.vm.box = "bento/ubuntu-22.04"
 
   # ==========================================
   # CONFIGURACIÓN BONUS (GitLab asfixia la RAM)
   # ==========================================
   config.vm.provider provider do |v|
-    # ¡GitLab oficial recomienda mínimo 4 GB! Usamos 6GB por si acaso.
+    # ¡GitLab oficial recomienda mínimo 4 GB! Usamos 8GB para evitar OOMs en Kubernetes.
     if provider == "virtualbox" || provider == "parallels"
-      v.memory = 6144
+      v.memory = 8192
       v.cpus = 3
     elsif provider == "vmware_desktop"
-      v.vmx["memsize"] = "6144"
+      v.vmx["memsize"] = "8192"
       v.vmx["numvcpus"] = "3"
+      v.vmx["cpuid.coresPerSocket"] = "1"
     end
   end
 
   # ==========================================
   # MÁQUINA DE DESPLIEGUE BONUS
   # ==========================================
-  config.vm.define "miguelS" do |server|
-    server.vm.hostname = "miguelS"
-    server.vm.network "private_network", ip: "192.168.56.110"
-    
-    server.vm.network "forwarded_port", guest: 8888, host: 8888
-    server.vm.network "forwarded_port", guest: 8080, host: 8080
+  config.vm.define "mlezcanoS" do |server|
+    server.vm.hostname = "mlezcanoS"
+    server.vm.network "private_network", ip: "192.168.56.111"
+
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS_bonus"
+        v.name = "mlezcanoS_bonus"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS_bonus"
+        v.vmx["displayname"] = "mlezcanoS_bonus"
       end
     end
     
     # En bonus el script de install debe instalar Docker, K3d, GitLab y ArgoCD.
     server.vm.provision "shell", path: "scripts/install.sh", privileged: true
+    server.vm.provision "shell", path: "scripts/post-install.sh", privileged: true
   end
 end
