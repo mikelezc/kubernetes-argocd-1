@@ -1,7 +1,12 @@
+# Este archivo es el que esta en el repositorio de github, y es el que se va a aplicar en el cluster de kubernetes. 
+# Contiene la definicion del deployment y del service para la aplicacion mlezcano-playground. 
+# Es importante que el namespace sea dev, tal y como indica el subject. 
+# El deployment tiene una replica, y el service es de tipo NodePort, con el puerto 30080.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: wil-playground
+  name: mlezcano-playground
   namespace: dev # IMPORTANTE: debe ir en el namespace dev, tal y como indica el subject
 spec:
   replicas: 1
@@ -13,17 +18,21 @@ spec:
       labels:
         app: playground
     spec:
+      imagePullSecrets:
+      - name: dockerhub-secret
       containers:
-      - name: wil-playground
-        image: playground:v1 # Imagen local construida en install.sh (cambiar a v2)
-        imagePullPolicy: Never # No descargar de Docker Hub, usar local
+      - name: mlezcano-playground
+        image: mikelezc/playground:v1
+        env:
+        - name: VERSION
+          value: "v1"
         ports:
         - containerPort: 8888
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: wil-playground
+  name: mlezcano-playground
   namespace: dev
 spec:
   type: NodePort
