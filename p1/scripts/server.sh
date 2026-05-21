@@ -4,7 +4,7 @@
 SERVER_IP=$1
 
 echo "========================================================="
-echo " Instalando K3S en modo SERVER en miguelS..."
+echo " Instalando K3S en modo SERVER en mlezcanoS..."
 echo "========================================================="
 
 # Descargar e instalar k3s.

@@ -6,7 +6,7 @@ Sigue estos pasos dentro de la VM (`vagrant ssh`) en orden. Copia/pega cada bloq
 ```bash
 sudo usermod -aG docker vagrant
 # Aplica sin cerrar sesión (o vuelve a reconectar):
-newgrp docker || (exit && vagrant ssh miguelS)
+newgrp docker || (exit && vagrant ssh mlezcanoS)
 ```
 
 ## 2) Comprobar que Docker y k3d funcionan

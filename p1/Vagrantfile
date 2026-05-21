@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # MAGIA CROSS-PLATFORM (ESCUELA vs MAC M4)
+  # CONFIGURACIÓN CROSS-PLATFORM (CAMPUS 42 vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
   # Determinamos la arquitectura del sistema donde se ejecuta:
   if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
@@ -30,15 +30,15 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MÁQUINA 1: Server (Controller)
   # ==========================================
-  config.vm.define "miguelS" do |server|
-    server.vm.hostname = "miguelS"
+  config.vm.define "mlezcanoS" do |server|
+    server.vm.hostname = "mlezcanoS"
     server.vm.network "private_network", ip: "192.168.56.110"
     
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS"
+        v.name = "mlezcanoS"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS"
+        v.vmx["displayname"] = "mlezcanoS"
       end
     end
     
@@ -49,15 +49,15 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MÁQUINA 2: Worker (Agent)
   # ==========================================
-  config.vm.define "miguelSW" do |worker|
-    worker.vm.hostname = "miguelSW"
+  config.vm.define "mlezcanoSW" do |worker|
+    worker.vm.hostname = "mlezcanoSW"
     worker.vm.network "private_network", ip: "192.168.56.111"
 
     worker.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelSW"
+        v.name = "mlezcanoSW"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelSW"
+        v.vmx["displayname"] = "mlezcanoSW"
       end
     end
     

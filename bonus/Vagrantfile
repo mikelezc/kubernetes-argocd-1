@@ -29,15 +29,15 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # MÁQUINA DE DESPLIEGUE BONUS
   # ==========================================
-  config.vm.define "miguelS" do |server|
-    server.vm.hostname = "miguelS"
+  config.vm.define "mlezcanoS" do |server|
+    server.vm.hostname = "mlezcanoS"
     server.vm.network "private_network", ip: "192.168.56.111"
 
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
-        v.name = "miguelS_bonus"
+        v.name = "mlezcanoS_bonus"
       elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "miguelS_bonus"
+        v.vmx["displayname"] = "mlezcanoS_bonus"
       end
     end
     

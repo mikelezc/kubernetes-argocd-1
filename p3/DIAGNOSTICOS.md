@@ -1,11 +1,11 @@
 # Diagnósticos y comandos útiles — Parte 3 (K3d + Argo CD)
 
-Guía rápida con los comandos que usamos para depurar conectividad DNS, Argo CD y sincronización del repo. Ejecuta los comandos en orden cuando estés dentro de la VM (`vagrant ssh miguelS`). Usa `sudo` cuando se indique.
+Guía rápida con los comandos que usamos para depurar conectividad DNS, Argo CD y sincronización del repo. Ejecuta los comandos en orden cuando estés dentro de la VM (`vagrant ssh mlezcanoS`). Usa `sudo` cuando se indique.
 
 ## Acceso a la VM
 
 ```bash
-vagrant ssh miguelS
+vagrant ssh mlezcanoS
 ```
 
 ## Comprobaciones básicas desde la VM (fuera del cluster)

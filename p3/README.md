@@ -45,7 +45,7 @@ Ahí debería verse ejecutándose la versión inicial de la Web (`wil42/playgrou
 4. Guárdalo (haz commit).
 5. Vuelve a mirar a `http://localhost:8888` pasados 90-120 segundos. ¡Verás cómo la página ha mutado a v2 totalmente en automático! 🤖
 
-*(Si quieres ver cómo está el robot ArgoCD trabajando por detrás, pregúntaselo entrando a tu clúster mediante `vagrant ssh miguelS` y explorando sus logs).*
+*(Si quieres ver cómo está el robot ArgoCD trabajando por detrás, pregúntaselo entrando a tu clúster mediante `vagrant ssh mlezcanoS` y explorando sus logs).*
 
 ## 🧹 Limpieza y Destrucción
 
@@ -84,7 +84,7 @@ Si Argo CD muestra error `ComparisonError` tipo `lookup github.com on 10.43.0.10
 
 ```bash
 # 1. Acceder a la VM
-vagrant ssh miguelS
+vagrant ssh mlezcanoS
 
 # Ya dentro de la VM, ejecuta esto:
 

@@ -5,7 +5,7 @@ Guía completa con todos los comandos para depurar y reparar problemas de DNS, A
 ## Acceso a la VM
 
 ```bash
-vagrant ssh miguelS
+vagrant ssh mlezcanoS
 ```
 
 ## Comprobaciones básicas desde la VM
@@ -128,7 +128,7 @@ curl http://localhost:8080/
 
 2. **Forzar Argo CD a detectar el cambio:**
    ```bash
-   vagrant ssh miguelS
+   vagrant ssh mlezcanoS
    
    # Revisar logs en tiempo real
    sudo kubectl logs -n argocd -l app.kubernetes.io/name=argocd-repo-server -f &

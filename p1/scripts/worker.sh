@@ -5,7 +5,7 @@ SERVER_IP=$1
 WORKER_IP=$2
 
 echo "========================================================="
-echo " Instalando K3S en modo AGENT en miguelSW..."
+echo " Instalando K3S en modo AGENT en mlezcanoSW..."
 echo "========================================================="
 
 # Recuperamos el TOKEN secreto que el servidor guardó en la carpeta compartida:

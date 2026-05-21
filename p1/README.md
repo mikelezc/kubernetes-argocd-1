@@ -11,23 +11,23 @@ Arquitectura de nuestro clúster:
 
 ## Requisitos de la Práctica (Subject)
 
-- **Máquina 1 (Server)**: Hostname `miguelS`, IP: `192.168.56.110`.
-- **Máquina 2 (Worker)**: Hostname `miguelSW`, IP: `192.168.56.111`.
+- **Máquina 1 (Server)**: Hostname `mlezcanoS`, IP: `192.168.56.110`.
+- **Máquina 2 (Worker)**: Hostname `mlezcanoSW`, IP: `192.168.56.111`.
 - K3s en modo *controller* en el Server, K3s en modo *agent* en el Worker.
 
 ## Checklist de verificación del cluster
 
-Si quieres comprobar que esta parte está bien antes de enseñar la demo, revisa esto paso a paso:
 
 1. **Confirmar que existen las dos máquinas**
   - En `p1/` ejecuta `vagrant up`.
-  - Luego comprueba que Vagrant ha levantado `miguelS` y `miguelSW`.
+  - Luego comprueba que Vagrant ha levantado `mlezcanoS` y `mlezcanoSW`.
+  - ***Nota*** Puedes ver esto en `p1/Vagrantfile` también.
 
 2. **Verificar que el Server y el Worker tienen los nombres correctos**
-  - Entra al Server con `vagrant ssh miguelS`.
+  - Entra al Server con `vagrant ssh mlezcanoS`.
   - Ejecuta `hostname` o `hostnamectl`.
-  - Debe responder `miguelS`.
-  - Si entras al Worker con `vagrant ssh miguelSW`, debe responder `miguelSW`.
+  - Debe responder `mlezcanoS`.
+  - Si entras al Worker con `vagrant ssh mlezcanoSW`, debe responder `mlezcanoSW`.
 
 3. **Verificar la interfaz de red `eth1` y sus IPs**
   - En cada máquina ejecuta `ip addr show eth1`.
@@ -36,13 +36,13 @@ Si quieres comprobar que esta parte está bien antes de enseñar la demo, revisa
   - Esta es la comprobación más importante de red para el evaluador.
 
 4. **Verificar que K3s está instalado y funcionando**
-  - Entra en el Server, porque ahí vive el control-plane. `vagrant ssh miguelS`
+  - Entra en el Server, porque ahí vive el control-plane. `vagrant ssh mlezcanoS`
   - Ejecuta `kubectl cluster-info`.
   - Debes ver que el control plane, CoreDNS y metrics-server están accesibles desde la API de K3s.
 
 5. **Verificar que ambos nodos están en el mismo clúster**
   - Desde el Server ejecuta `kubectl get nodes -o wide`.
-  - Deben aparecer `miguelS` y `miguelSW`.
+  - Deben aparecer `mlezcanoS` y `mlezcanoSW`.
   - Ambos deben estar en estado `Ready`.
 
 6. **Verificar que los pods del sistema están arriba**
@@ -75,13 +75,13 @@ Ejecutamos Vagrant para levantar ambas máquinas:
 Como el clúster existe **dentro** de las máquinas virtuales, primero debes entrar al servidor (que es donde reside el control-plane y `kubectl`):
 
 ```bash
-vagrant ssh miguelS
+vagrant ssh mlezcanoS
 ```
 
 Una vez dentro, usaremos estos comandos:
 
 - **1. Comprobar los nodos del clúster:**
-  Se espera ver a `miguelS` (control-plane) y `miguelSW` (agent) con estado `Ready`.
+  Se espera ver a `mlezcanoS` (control-plane) y `mlezcanoSW` (agent) con estado `Ready`.
   ```bash
   kubectl get nodes -o wide
   ```
