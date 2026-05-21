@@ -70,7 +70,7 @@ sudo kubectl describe deployment argocd-repo-server -n argocd
 ```bash
 # Ejecutar un comando git desde dentro del pod repo-server
 POD=$(sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].metadata.name}')
-sudo kubectl -n argocd exec -it $POD -- sh -c "apk add --no-cache git ca-certificates >/dev/null 2>&1 || true; git ls-remote https://github.com/mikelezc/miguel-iot-argocd.git"
+sudo kubectl -n argocd exec -it $POD -- sh -c "apk add --no-cache git ca-certificates >/dev/null 2>&1 || true; git ls-remote https://github.com/mikelezc/mlezcano-iot-argocd.git"
 
 # Ajusta la URL del repo en el comando anterior si usas otra
 ```
@@ -118,7 +118,7 @@ sudo kubectl logs -n argocd -l app.kubernetes.io/name=argocd-repo-server -f
 sudo kubectl get applications.argoproj.io iot-app -n argocd -o yaml | sed -n '/^status:/,$p'
 
 # Clonar el repo desde la VM y mostrar deployment.yaml (verifica ruta y tag)
-git clone https://github.com/mikelezc/miguel-iot-argocd.git /tmp/test-repo || true
+git clone https://github.com/mikelezc/mlezcano-iot-argocd.git /tmp/test-repo || true
 ls -la /tmp/test-repo
 sed -n '1,200p' /tmp/test-repo/deployment.yaml || true
 
@@ -139,7 +139,7 @@ curl -s http://localhost:8888/ | jq .
 
 ```bash
 # Si sospechas de permisos o firewall, prueba clonar desde la VM (fuera del cluster)
-git clone https://github.com/mikelezc/miguel-iot-argocd.git /tmp/test-repo || true
+git clone https://github.com/mikelezc/mlezcano-iot-argocd.git /tmp/test-repo || true
 ls -la /tmp/test-repo || true
 ```
 
@@ -154,7 +154,7 @@ Si necesitas actualizar `repoURL` para añadir `.git` o forzar un refresh desde 
 
 ```bash
 # Parchear la Application para ajustar repoURL (añade .git si falta)
-sudo kubectl -n argocd patch application iot-app --type='json' -p '[{"op":"replace","path":"/spec/source/repoURL","value":"https://github.com/mikelezc/miguel-iot-argocd.git"}]'
+sudo kubectl -n argocd patch application iot-app --type='json' -p '[{"op":"replace","path":"/spec/source/repoURL","value":"https://github.com/mikelezc/mlezcano-iot-argocd.git"}]'
 
 # Forzar un refresh equivalente al botón REFRESH
 sudo kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh="true" --overwrite
@@ -183,7 +183,7 @@ sleep 10
 
 # Verificar resolución desde argocd-repo-server y forzar refresh
 POD=$(sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].metadata.name}')
-sudo kubectl -n argocd exec -it $POD -- sh -c "git ls-remote https://github.com/mikelezc/miguel-iot-argocd.git"
+sudo kubectl -n argocd exec -it $POD -- sh -c "git ls-remote https://github.com/mikelezc/mlezcano-iot-argocd.git"
 
 # Forzar refresh de la Application
 sudo kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh="true" --overwrite

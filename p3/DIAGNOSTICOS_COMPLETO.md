@@ -63,7 +63,7 @@ sleep 10
 
 # 4. Verificar que argocd-repo-server puede acceder a GitHub
 POD=$(sudo kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].metadata.name}')
-sudo kubectl -n argocd exec -it $POD -- sh -c "git ls-remote https://github.com/mikelezc/miguel-iot-argocd.git"
+sudo kubectl -n argocd exec -it $POD -- sh -c "git ls-remote https://github.com/mikelezc/mlezcano-iot-argocd.git"
 # Esperado: hash + refs/heads/main (sin errores)
 ```
 
@@ -98,14 +98,14 @@ sudo kubectl get events -n argocd --sort-by=.metadata.creationTimestamp | tail -
 
 ### Parchear repoURL (si cambiaste la URL del repo)
 ```bash
-sudo kubectl -n argocd patch application iot-app --type='json' -p '[{"op":"replace","path":"/spec/source/repoURL","value":"https://github.com/mikelezc/miguel-iot-argocd.git"}]'
+sudo kubectl -n argocd patch application iot-app --type='json' -p '[{"op":"replace","path":"/spec/source/repoURL","value":"https://github.com/mikelezc/mlezcano-iot-argocd.git"}]'
 ```
 
 ## Verificación del repositorio
 
 ```bash
 # Clonar el repo desde la VM y ver deployment.yaml
-git clone https://github.com/mikelezc/miguel-iot-argocd.git /tmp/test-repo || true
+git clone https://github.com/mikelezc/mlezcano-iot-argocd.git /tmp/test-repo || true
 ls -la /tmp/test-repo
 cat /tmp/test-repo/deployment.yaml
 ```

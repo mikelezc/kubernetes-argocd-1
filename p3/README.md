@@ -13,12 +13,12 @@ El objetivo de la Parte 3 es abandonar el despliegue manual (donde alguien hace 
 Antes de levantar la máquina, conectamos nuestro GitHub personal:
 
 1. **Creamos un Repo Público en GitHub**:
-   - Nómbralo con tu nombre de usuario de 42, por ejemplo: `miguel-iot-argocd`.
-   - Entra en la carpeta `app-para-tu-github/` de este proyecto, copia el archivo `deployment.yaml` de ahí y súbelo a tu nuevo repo.
+   - Lo nombramos con nuestro login de la intra: `mlezcano-iot-argocd`.
+   - Subimos `deployment.yaml` de la carpeta `repo-github/` al repo que acabamos de crear.
    
-2. **Conectamos el Repo en tus archivos locales de P3**:
-   - Entra en `confs/argocd.yaml`.
-   - Busca donde dice `repoURL: ...` y cambia eso por la URL real de tu repositorio (por ejemplo: `https://github.com/TUGITHUB/miguel-iot-argocd.git`).
+2. **Conectando el Repo a los archivos locales de P3**:
+   - Vamos a `confs/argocd.yaml`.
+   - Busca donde dice `repoURL: ...` y asignamos la URL real del repositorio (en este caso: `https://github.com/TUGITHUB/mlezcano-iot-argocd.git`).
 
 ## ¿Cómo levantar todo?
 Aunque el subject dice que P3 no necesita Vagrant y que todo se ejecuta en consola sobre Linux, hemos **demostrado un extra de sofisticación** incorporando un Vagrantfile automatizado también aquí. 
