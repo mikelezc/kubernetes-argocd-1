@@ -240,11 +240,12 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ## Cómo cambiar de v1 a v2
 
-El cambio de versión se hace desde el repo de GitHub, no desde la VM.
+Hacemos el cambio de versión desde el repo de GitHub.
+Esto demuestra que Argo CD está haciendo el pollin continuo de nuestro repo en github (requerido por el subject).
 
 ### Paso 1: editar el deployment
 
-Abre el archivo `deployment.yaml` de tu repo público y cambia:
+Abrimos el archivo `deployment.yaml` del repo público y cambiamos:
 
 ```yaml
 value: "v1"
@@ -260,79 +261,52 @@ La imagen puede quedarse igual. La app lee la variable de entorno `VERSION` y pi
 
 ### Paso 2: commit y push
 
-Haz commit y push al repo público.
+Hacemos commit y push al repo público (o desde el propio GitHub).
 
 ### Paso 3: esperar o refrescar
 
-Argo CD debería detectar el cambio y sincronizar solo.
+Argo CD detecta el cambio y sincronizará solo, aunque debemos tener en cuenta que tardará en refrescar unos minutos.
 
-Si no lo hace de inmediato, refresca la app desde la UI de Argo CD o fuerza un refresh desde kubectl.
-
-En este proyecto, el intervalo de reconciliación de Argo CD se deja en 5 segundos, así que el cambio suele aparecer enseguida sin intervención manual.
-
-Si necesitas forzar el polling o no quieres esperar al siguiente ciclo, usa esto:
+También podemos refrescar la app desde la UI de Argo CD o forzar un refresh desde kubectl para no esperar.
 
 ```bash
 kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
 ```
 
-Si además quieres reiniciar el despliegue en el cluster para que el pod vuelva a levantarse inmediatamente, puedes usar:
+Si además queremos reiniciar el despliegue en el cluster para que el pod vuelva a levantarse inmediatamente:
 
 ```bash
 kubectl -n dev rollout restart deployment/mlezcano-playground
 ```
 
-Ese segundo comando no suele ser necesario si Argo CD está sincronizando bien, pero sirve como fallback durante la defensa.
+Ese segundo comando no suele ser necesario al estar Argo CD bien sincronizando, pero lo hemos usado como fallback en desarrollo bastante y resulta útil.
 
 ### Paso 4: verificar la nueva versión
 
-Vuelve a entrar en la app:
+Volvemos a entrar en la app:
 
 ```bash
 curl http://localhost:8888/
 ```
 
-Deberías ver el mensaje de la versión `v2`.
+Comprobamos el mensaje de la versión `v2`.
 
-## Qué comprobar durante la defensa
-
-Si te piden mostrar el flujo completo, lo ideal es ir en este orden:
-
-1. Mostrar que existen `argocd` y `dev`.
-2. Mostrar que hay al menos un pod en `dev`.
-3. Mostrar la UI de Argo CD.
-4. Mostrar la app en `v1`.
-5. Cambiar `VERSION` en GitHub a `v2`.
-6. Esperar la sincronización.
-7. Volver a mostrar la app en `v2`.
 
 ## Limpieza
 
-### Si usaste Vagrant
-
-```bash
-vagrant destroy -f
-```
-
-Si quieres limpiar también el estado local de Vagrant:
-
-```bash
-rm -rf .vagrant/
-```
-
-### Si usaste K3d directamente
+Para limpiar el cluster y las imágenes, y archivos generados con docker ejecutaremos los siguientes comandos:
 
 ```bash
 k3d cluster delete iot-cluster
 ```
 
-Ese comando borra el cluster, pero no limpia por sí solo todos los recursos que Docker puede dejar atrás.
+**Nota** Ese comando borra el cluster, pero no limpia por sí solo todos los recursos que Docker puede dejar atrás.
 
 ### Limpieza completa de Docker
 
-Si quieres dejar el entorno totalmente limpio, puedes borrar también contenedores, imágenes, volúmenes y redes que ya no uses.
+Para dejar el entorno totalmente limpio, borrar también contenedores, imágenes, volúmenes y redes.
 
-Primero revisa qué hay antes de borrar nada:
+Primero revisamos qué hay antes de borrar nada:
 
 ```bash
 docker ps -a
@@ -341,7 +315,7 @@ docker volume ls
 docker network ls
 ```
 
-Luego, si quieres un reset completo del entorno local de este proyecto:
+Borrado completo del entorno local de este proyecto:
 
 ```bash
 docker rm -f $(docker ps -aq)
@@ -350,7 +324,7 @@ docker volume prune -f
 docker network prune -f
 ```
 
-Si prefieres una limpieza menos agresiva, usa solo estos comandos:
+Limpieza menos agresiva:
 
 ```bash
 docker container prune -f
@@ -359,17 +333,5 @@ docker volume prune -f
 docker network prune -f
 ```
 
-Ten en cuenta que los comandos anteriores pueden borrar recursos de otros proyectos si los estás reutilizando en la misma instalación de Docker.
+Tendremos en cuenta que los comandos anteriores pueden borrar recursos de otros proyectos si los reutilizamos en la misma instalación de Docker.
 
-## Si algo falla
-
-Si la instalación no termina o Argo CD no sincroniza, revisa esta secuencia:
-
-1. Verifica que Docker responde.
-2. Verifica que el cluster existe.
-3. Verifica que los pods de Argo CD están Running.
-4. Verifica que `kubectl get ns` muestra `argocd` y `dev`.
-5. Verifica que el repo GitHub es público y la URL del Application es correcta.
-6. Verifica que `deployment.yaml` usa el login correcto en la imagen y que `VERSION` está en `v1` o `v2`.
-
-Si necesitas más detalle de diagnóstico, usa [DIAGNOSTICOS_COMPLETO.md](DIAGNOSTICOS_COMPLETO.md).
