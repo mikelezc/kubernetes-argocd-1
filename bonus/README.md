@@ -149,7 +149,7 @@ cd /vagrant/scripts
 ./create-gitlab-project-and-push.sh
 ```
 
-2. Edita [p3/confs/argocd.yaml](../p3/confs/argocd.yaml) y cambia `spec.source.repoURL`:
+2. Edita [p3/confs/argocd.yaml](../p3/confs/argocd.yaml) y cambia `spec.source.repoURL` a la URL interna que sí resuelve dentro del clúster:
 
 De:
 
@@ -160,16 +160,38 @@ repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd.git'
 A:
 
 ```yaml
-repoURL: 'http://gitlab.local/root/mlezcano-gitlab-demo.git'
+repoURL: 'http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git'
 ```
 
-3. Aplica el manifiesto actualizado en Argo CD:
+3. Registra el repositorio privado en Argo CD (esto es obligatorio porque el proyecto se crea en privado):
 
 ```bash
-kubectl apply -f /vagrant/p3/confs/argocd.yaml
+ROOT_PASSWORD=$(kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d)
+kubectl -n argocd delete secret repo-gitlab-local --ignore-not-found
+kubectl -n argocd create secret generic repo-gitlab-local \
+	--from-literal=type=git \
+	--from-literal=url=http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git \
+	--from-literal=username=root \
+	--from-literal=password="$ROOT_PASSWORD" \
+	--from-literal=forceHttpBasicAuth=true \
+	--from-literal=insecure=true
+kubectl -n argocd label secret repo-gitlab-local argocd.argoproj.io/secret-type=repository --overwrite
+kubectl -n argocd rollout restart deployment argocd-repo-server
+kubectl -n argocd rollout status deployment argocd-repo-server --timeout=180s
 ```
 
-4. Fuerza reconciliación y comprueba que ya usa GitLab:
+4. Aplica el cambio en Argo CD (elige según dónde ejecutes):
+
+```bash
+# Si estás en el host, dentro de la carpeta bonus/
+kubectl apply -f ../p3/confs/argocd.yaml
+
+# Si estás dentro de la VM (vagrant ssh mlezcanoS), usa patch directo
+# porque /vagrant solo monta la carpeta bonus y no contiene p3/
+kubectl -n argocd patch application iot-app --type merge -p '{"spec":{"source":{"repoURL":"http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git","targetRevision":"main","path":"."}}}'
+```
+
+5. Fuerza reconciliación y comprueba que ya usa GitLab:
 
 ```bash
 kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
@@ -179,15 +201,32 @@ kubectl -n argocd get application iot-app
 
 Resultado esperado:
 
-- `repoURL` debe ser `http://gitlab.local/root/mlezcano-gitlab-demo.git`.
+- `repoURL` debe ser `http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git`.
 - `SYNC STATUS` debe pasar a `Synced`.
 - `HEALTH STATUS` debe pasar a `Healthy`.
+
+Si ves `ComparisonError` con `authentication required`, significa que Argo CD sí ve la URL del repo pero todavía no puede clonar el proyecto privado. En ese caso:
+
+1. Comprueba que existe la secret `repo-gitlab-local` en el namespace `argocd`.
+2. Verifica que la secret tenga `forceHttpBasicAuth=true`, `username=root` y la contraseña inicial de GitLab.
+3. Reinicia `argocd-repo-server` para limpiar caché:
+
+```bash
+kubectl -n argocd rollout restart deployment argocd-repo-server
+kubectl -n argocd rollout status deployment argocd-repo-server --timeout=180s
+```
+
+4. Vuelve a refrescar la Application:
+
+```bash
+kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
+```
 
 Nota: si al principio aparece `OutOfSync`, pulsa `Refresh` o `Sync` en la UI de Argo CD y espera unos segundos.
 
 Qué se revisa:
 
-- Que el repo de Argo CD apunte a `gitlab.local`.
+- Que el repo de Argo CD apunte a `gitlab-webservice-default.gitlab.svc:8181`.
 - Que el manifiesto del despliegue siga usando la app de la Parte 3 con sus dos versiones.
 - Que el cambio `v1 -> v2` se refleje tras el commit/push.
 

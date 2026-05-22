@@ -26,6 +26,7 @@ GITLAB_URL="http://gitlab.local"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
+ARGO_REPO_URL="http://gitlab-webservice-default.gitlab.svc:8181/${PROJECT_FULL_PATH}.git"
 PROJECT_URL=""
 PROJECT_REPO_URL=""
 
@@ -207,16 +208,21 @@ print_next_steps() {
   cat <<EOF
 
 === Siguiente paso para la corrección ===
-1. Si Argo CD ya apunta a este repo local, abre la UI y comprueba Sync/Health.
-2. Si aún no apunta al repo local, actualiza bonus/confs/argocd.yaml con:
-   ${PROJECT_REPO_URL}
-3. En Argo CD, fuerza Refresh o Sync si hace falta.
+1. Registra el repo privado en Argo CD con credenciales:
+  ROOT_PASSWORD=\$(kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d)
+  kubectl -n argocd delete secret repo-gitlab-local --ignore-not-found
+  kubectl -n argocd create secret generic repo-gitlab-local --from-literal=type=git --from-literal=url=${ARGO_REPO_URL} --from-literal=username=root --from-literal=password="\$ROOT_PASSWORD" --from-literal=forceHttpBasicAuth=true --from-literal=insecure=true
+  kubectl -n argocd label secret repo-gitlab-local argocd.argoproj.io/secret-type=repository --overwrite
+2. Haz que iot-app apunte al repo interno resolvible desde el clúster:
+  kubectl -n argocd patch application iot-app --type merge -p '{"spec":{"source":{"repoURL":"${ARGO_REPO_URL}","targetRevision":"main","path":"."}}}'
+3. Fuerza Refresh o Sync en Argo CD.
 4. Valida la app con:
    curl http://localhost:8888/
 5. Cambia VERSION a v2 en el repo de GitLab y repite el push para mostrar la reconcilación.
 
 URL del proyecto: ${PROJECT_URL}
 Repositorio creado: ${PROJECT_REPO_URL}
+URL interna para Argo CD: ${ARGO_REPO_URL}
 EOF
 }
 
