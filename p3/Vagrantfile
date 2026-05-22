@@ -15,11 +15,11 @@ Vagrant.configure("2") do |config|
   # ==========================================
   config.vm.provider provider do |v|
     if provider == "virtualbox" || provider == "parallels"
-      v.memory = 3072 # 3GB RAM para no sufrir con ArgoCD y K3D
-      v.cpus = 2
+      v.memory = Integer(ENV.fetch("P3_MEMORY", "3072"))
+      v.cpus = Integer(ENV.fetch("P3_CPUS", "2"))
     elsif provider == "vmware_desktop"
-      v.vmx["memsize"] = "3072"
-      v.vmx["numvcpus"] = "2"
+      v.vmx["memsize"] = ENV.fetch("P3_MEMORY", "3072")
+      v.vmx["numvcpus"] = ENV.fetch("P3_CPUS", "2")
     end
   end
 
@@ -30,7 +30,6 @@ Vagrant.configure("2") do |config|
     server.vm.hostname = "mlezcanoS"
     server.vm.network "private_network", ip: "192.168.56.110"
     
-    # Redirigimos el localhost de la VM al localhost del Mac para cumplir con el tutorial
     server.vm.network "forwarded_port", guest: 8888, host: 8888
     server.vm.network "forwarded_port", guest: 8080, host: 8080
     server.vm.provider provider do |v|
@@ -41,7 +40,7 @@ Vagrant.configure("2") do |config|
       end
     end
     
-    # En p3 instalamos K3d y Docker desde el script
+    # En p3 instalamos Docker, K3d y Argo CD desde el script
     server.vm.provision "shell", path: "scripts/install.sh", privileged: true
   end
 end

@@ -8,19 +8,13 @@ metadata:
 spec:
   project: default
   source:
-    # CAMBIAMOS LA URL DE ABAJO POR EL REPO DE GITHUB QUE HA CREADO
-    # 🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴
-    repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd'
-    # Esta es la rama, "main" por defecto, pon main, si no, dejalo en master.
-    targetRevision: HEAD
-    # Dejamos la ruta (.) para que escanee la base de tu repo buscando el deployment.yaml
+    repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd.git'
+    targetRevision: main
     path: '.'
   destination:
     server: 'https://kubernetes.default.svc'
-    # El destination namespace debe coincidir con el 'dev' de nuestro yaml
     namespace: dev
   syncPolicy:
-    # Estas opciones le dicen a ArgoCD que al ver cambios en Github, aplique automáticamente (auto sync).
     automated:
-      prune: true     # Borra cosas obsoletas
-      selfHeal: true  # Se asegura de reinstalar si borrás algo accidentalmente en el cluster
+      prune: true
+      selfHeal: true

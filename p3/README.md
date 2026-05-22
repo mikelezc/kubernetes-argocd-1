@@ -1,128 +1,337 @@
-# Parte 3: K3d y Argo CD (Concepto GitOps)
+# Parte 3: K3d y Argo CD
 
-## Conceptos Clave 
+## Conceptos Clave
 
-El objetivo de la Parte 3 es abandonar el despliegue manual (donde alguien hace un `kubectl apply -f` o levanta los archivos a mano) y abrazar la automatización extrema y la metodología **GitOps**.
+Esta parte está pensada para una infraestructura mínima con los siguientes conceptos:
 
-1. **K3d (K3s in Docker)**: Es una herramienta que nos permite levantar un clúster K3s completo dentro de contenedores Docker. Es decir, Docker es el único requisito. Ahorra muchísimos recursos, ya que levanta el server y los workers virtualizados en la misma máquina mediante contenedores.
+1. Ejecutaremos el script  ``./scripts/install.sh``
+2. Este instala Docker, kubectl y k3d
+3. Se creará un cluster K3d pequeño, con un solo server.
+4. Se instalan dos namespaces: `argocd` y `dev`.
+5. Argo CD mira a mi repo público de GitHub 
+	``https://github.com/mikelezc/mlezcano-iot-argocd/``.
+6. La aplicación que despliega Argo CD usa una imagen propia de DockerHub del grupo.
+7. La versión de esta aplicación actualizará automáticamente según cambiemos el número de versión en el repo de github.
 
-2. **Argo CD y GitOps**: GitOps significa que "El repositorio de Git es la única fuente de verdad". Instalaremos **Argo CD** en nuestro clúster. Argo CD es un bot vigilante que estará mirando TODO EL RATO a nuestro repositorio público de GitHub. Si en Github escribimos que queremos que `app1` tenga la versión `v2`, Argo CD lo detecta y lo cambia automáticamente en nuestro K3s **evitamos intervenir manualmente para hacer una pull**
+## Qué hay en esta carpeta
 
-## Requisitos Previos
+1. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el cluster, despliega Argo CD y aplica la Application.
 
-Antes de levantar la máquina, conectamos nuestro GitHub personal:
+2. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de Argo CD que apunta al repo GitHub.
 
-1. **Creamos un Repo Público en GitHub**:
-   - Lo nombramos con nuestro login de la intra: `mlezcano-iot-argocd`.
-   - Subimos `deployment.yaml` de la carpeta `repo-github/` al repo que acabamos de crear.
-   
-2. **Conectando el Repo a los archivos locales de P3**:
-   - Vamos a `confs/argocd.yaml`.
-   - Busca donde dice `repoURL: ...` y asignamos la URL real del repositorio (en este caso: `https://github.com/TUGITHUB/mlezcano-iot-argocd.git`).
+3. [repo-github/deployment.yaml](repo-github/deployment.yaml): manifiesto que ha sido subido a nuestro repo público.
 
-## Cómo levantar todo
-Aunque el subject dice que P3 no necesita Vagrant y que todo se ejecuta en consola sobre Linux, hemos incorporando un Vagrantfile automatizado también aquí. 
+4. [repo-dockerhub/deployment.yaml](repo-dockerhub/): carpeta con la aplicación que subimos a dockerhub para esta práctica.
 
-Hemos preparado un Vagrantfile para que el Mac de desarrollo (o el Linux del campus gracias al soporte Multi-Arquitectura) proporcione una VM que encapsule todo.
+5. [Vagrantfile](Vagrantfile): envoltorio opcional para levantar una VM de desarrollo.
 
-1. Estando en P3, lanza el entorno:
-   ```bash
-   vagrant up
-   ```
-2. El propio archivo automatizado lanzará el script `scripts/install.sh`, el cual:
-   - Instalará Docker y K3d.
-   - Creará un clúster en Docker llamado `iot-cluster` vinculando los puertos locales 8888.
-   - Desplegará Argo CD.
-   - Desplegará la ruta apuntando al Repo público.
 
-## Probamos la conexión con el repo (GitOps).
-Abrimos el navegador de internet (fuera de la VM) y vamos a:
-`http://localhost:8888`
-Ahí debería verse ejecutándose la versión inicial de la Web (`wil42/playground:v1`, por ejemplo).
+## Requisitos previos
 
-**Prueba de que funciona corréctamente (GitOps):**
-1. Ve a la página de **Github** (a tu navegador de internet, en tu nube). 
-2. Edita manualmente el archivo en GitHub (`deployment.yaml`).
-3. Cambia `playground:v1` por `playground:v2`.
-4. Guárdalo (haz commit).
-5. Vuelve a mirar a `http://localhost:8888` pasados 90-120 segundos. **Comprobaremos cómo la página ha mutado a v2 totalmente en automático**
+1. Tener Docker disponible.
 
-*(Si queremos ver cómo está el robot ArgoCD trabajando por detrás, pregúntaselo entrando a tu clúster mediante `vagrant ssh mlezcanoS` y explorando los logs).*
+2. Tener acceso a GitHub y un repo público en este caso es creado con el login de un miembro del grupo en el nombre. 
+Hemos tenido que hacer la aplicación, meterla en un contenedor y subirla a dockerhub manualmente, ya que el proyecto se ha desarrollado en una Mac con M4 pro y necesitábamos un contenedor multi arquitectura que se pudiera desplegar en máquinas con AMD y ARM.
 
-## Limpieza y Destrucción
+	```https://hub.docker.com/repository/docker/mikelezc/playground/general```
 
-### Destrucción Simple (Normal)
-Al igual que en p1 y p2:
-```bash
-vagrant destroy -f
+3. Tener una VM disponible si vas a hacer la defensa en entorno aislado.
+4. Tener el repo ya clonado localmente para editar los ficheros del proyecto.
+
+## Estructura del repo GitHub
+
+El repo público de GitHub contiene el archivo `deployment.yaml` en la raíz.
+
+El nombre del repo incluye el login de alguien del grupo:
+
+```text
+mlezcano-iot-argocd
 ```
 
-### Limpieza Exhaustiva (Si la VM se cuelga o queda datos colgados)
-Si `vagrant up` falla repetidamente, usa este procedimiento completo:
+La imagen que usa el deployment está en DockerHub bajo el login de un miembro del grupo:
+
+```yaml
+image: mlezcano/playground:v1
+```
+
+## Diferentes maneras desplegar todo
+
+Como levantar la infraestructura:
+
+1. En macOS, con Docker Desktop abierto y funcionando.
+2. Dentro de una VM Linux ligera tal y como pide el subject.
+
+En ambos casos usaremos el script de despliegue:
 
 ```bash
-# 1. Destruir la máquina
-vagrant destroy -f
+./scripts/install.sh
+```
 
-# 2. Limpiar estado de Vagrant
-rm -rf .vagrant/
+**Hay un archivo Vagrant para la VM de desarrollo:**
 
-# 3. Verificar y limpiar procesos VMware colgados en tu Mac
-ps aux | grep -E "(vmware|vagrant)" | grep -v grep
-
-# 4. Si ves procesos viejos, matarlos (opcional, sólo si es necesario)
-sudo pkill -f vmware-usbarbitrator || true
-sudo pkill -f vagrant-vmware || true
-
-# 5. Relanzar
+```bash
 vagrant up
 ```
 
-## Diagnósticos: Verificar Conectividad DNS del Cluster
+El Vagrantfile está pensado para preparar una VM simple y luego ejecutar el script de instalación automáticamente. 
+Se ha realizado como implementación extra y aplicando lo aprendido en los niveles anteriores con fines didácticos.
+Al no ser requerido por el subject es algo simplemente opcional, aunque funciona como "envoltorio" automatizando todo (tira del mismo script igualmente).
 
-Si Argo CD muestra error `ComparisonError` tipo `lookup github.com on 10.43.0.10:53: no such host`, significa que CoreDNS dentro del cluster no puede resolver github.com.
+## Qué hace el script de instalación
 
-### Comandos de diagnóstico (ejecuta en orden):
+1. Comprueba si Docker está instalado.
+2. Comprueba si kubectl está instalado.
+3. Comprueba si k3d está instalado.
+4. Verifica que Docker responde.
+5. Borra el cluster anterior si existía.
+6. Crea el cluster K3d.
+7. Ajusta CoreDNS para que la resolución externa sea estable.
+8. Crea los namespaces `argocd` y `dev`.
+9. Instala Argo CD.
+10. Reduce la reconciliación de Argo CD a unos pocos segundos para que los cambios se noten rápido.
+11. Expone Argo CD por HTTP para poder abrir su UI desde el host.
+12. Aplica la Application que apunta al repo público.
+
+## Despliegue paso a paso
+
+### Opción A: en macOS con Docker Desktop
+
+1. Abre Docker Desktop y espera a que esté listo.
+2. Abre una terminal en este directorio.
+3. Ejecuta:
 
 ```bash
-# 1. Acceder a la VM
+./scripts/install.sh
+```
+
+4. Espera a que termine.
+5. Abre la UI de Argo CD en:
+
+```bash
+http://localhost:8080
+```
+
+6. Abre la aplicación en:
+
+```bash
+http://localhost:8888
+```
+
+### Opción B: dentro de una VM con Vagrant
+
+1. Entra en la carpeta `p3`.
+2. Arranca la VM:
+
+```bash
+vagrant up
+```
+
+3. Espera a que acabe el provisionamiento.
+4. Si necesitas acceder a la VM manualmente:
+
+```bash
 vagrant ssh mlezcanoS
-
-# Ya dentro de la VM, ejecuta esto:
-
-# 2. Comprobar DNS desde la VM (debería funcionar)
-nslookup github.com
-
-# 3. Ver si resolv.conf está bien
-cat /etc/resolv.conf
-
-# 4. Verificar que CoreDNS está corriendo
-kubectl get pods -n kube-system | grep coredns
-
-# 5. Ver logs de CoreDNS
-kubectl logs -n kube-system -l k8s-app=kube-dns --tail=20 || true
-
-# 6. Crear un pod temporal DENTRO del cluster y probar DNS desde ahí
-kubectl run -it --rm --restart=Never --image=alpine dns-test -- sh
-
-# Una vez dentro del pod alpine (verás prompt "/ #"):
-nslookup github.com
-ping -c 2 github.com
-curl -I https://github.com
-exit
 ```
 
-### Si falla en el paso 6 (DNS desde dentro del cluster):
+5. Dentro de la VM puedes comprobar el estado del cluster con kubectl.
+
+## Comprobaciones obligatorias
+
+### 1. Ver namespaces
+
+Revisamos los namespaces requeridos:
 
 ```bash
-# Reiniciar CoreDNS
-kubectl rollout restart deployment/coredns -n kube-system
-kubectl rollout status deployment/coredns -n kube-system --timeout=60s
-sleep 30
-
-# Repetir paso 6 para verificar que funciona
-
-# Luego, en Argo CD UI, pulsa REFRESH para que reintente leer el repo
-# O fuerza un pod nuevo del repo-server:
-kubectl -n argocd delete pod -l app.kubernetes.io/name=argocd-repo-server
+kubectl get ns
 ```
+
+Resultado esperado:
+
+```text
+NAME      STATUS   AGE
+argocd    Active   ...
+dev       Active   ...
+```
+
+**NOTA** Además de esos dos, Kubernetes crea otros namespaces por defecto:
+
+1. `default`: namespace general que Kubernetes crea al instalar el cluster. Si no indicas otro namespace, los recursos acaban aquí.
+2. `kube-system`: donde viven los componentes internos del cluster, como CoreDNS, el proxy o partes del control plane.
+3. `kube-public`: namespace público reservado para información que puede ser leída sin autenticación no lo tocamos.
+4. `kube-node-lease`: lo usa Kubernetes para las leases de los nodos y saber si siguen vivos.
+
+Lo importante es que hemos creado `argocd` y `dev`. Los demás aparecen siempre en un cluster recién creado.
+
+### 2. Ver pods en `dev`
+
+Comprobamos que la aplicación existe y está levantada:
+
+```bash
+kubectl get pods -n dev
+```
+
+Resultado esperado:
+
+```text
+NAME                           READY   STATUS    RESTARTS   AGE
+mlezcano-playground-...        1/1     Running   0          ...
+```
+
+### 3. Ver la Application de Argo CD
+
+```bash
+kubectl get applications -n argocd
+```
+
+Comprobamos la Application `iot-app` y su estado.
+
+```text
+NAME      SYNC STATUS   HEALTH STATUS
+iot-app   Synced        Healthy
+```
+
+### 4. Ver el deployment que se está usando
+
+El archivo `deployment.yaml` del repo GitHub debe estar apuntando a la versión esperada:
+
+```bash
+        env:
+        - name: VERSION
+          value: "v1" # esta es la variable que tenemos que cambiar para las pruebas (v1 o v2).
+```
+
+### 5. Ver la app desde el navegador o con curl
+
+Abrimos la aplicación en:
+
+```bash
+http://localhost:8888
+```
+
+O desde terminal:
+
+```bash
+curl http://localhost:8888/
+```
+
+La respuesta debe ser la de la versión activa de la app.
+
+### 6. Ver la UI de Argo CD
+
+Argo CD debe responder en:
+
+```bash
+http://localhost:8080
+```
+
+Usuario por defecto:
+
+```text
+admin
+```
+
+La contraseña inicial la imprime el script al final.
+
+Se puede obtener manualmente, leyendo el secreto del cluster:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+```
+
+## Cómo cambiar de v1 a v2
+
+Hacemos el cambio de versión desde el repo de GitHub.
+Esto demuestra que Argo CD está haciendo el pollin continuo de nuestro repo en github (requerido por el subject).
+
+### Paso 1: editar el deployment
+
+Abrimos el archivo `deployment.yaml` del repo público y cambiamos:
+
+```yaml
+value: "v1"
+```
+
+por:
+
+```yaml
+value: "v2"
+```
+
+La imagen puede quedarse igual. La app lee la variable de entorno `VERSION` y pinta v1 o v2 según ese valor.
+
+### Paso 2: commit y push
+
+Hacemos commit y push al repo público (o desde el propio GitHub).
+
+### Paso 3: esperar o refrescar
+
+Argo CD detecta el cambio y sincronizará solo, aunque debemos tener en cuenta que tardará en refrescar unos minutos.
+
+También podemos refrescar la app desde la UI de Argo CD o forzar un refresh desde kubectl para no esperar.
+
+```bash
+kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
+```
+
+Si además queremos reiniciar el despliegue en el cluster para que el pod vuelva a levantarse inmediatamente:
+
+```bash
+kubectl -n dev rollout restart deployment/mlezcano-playground
+```
+
+Ese segundo comando no suele ser necesario al estar Argo CD bien sincronizando, pero lo hemos usado como fallback en desarrollo bastante y resulta útil.
+
+### Paso 4: verificar la nueva versión
+
+Volvemos a entrar en la app:
+
+```bash
+curl http://localhost:8888/
+```
+
+Comprobamos el mensaje de la versión `v2`.
+
+
+## Limpieza
+
+Para limpiar el cluster y las imágenes, y archivos generados con docker ejecutaremos los siguientes comandos:
+
+```bash
+k3d cluster delete iot-cluster
+```
+
+**Nota** Ese comando borra el cluster, pero no limpia por sí solo todos los recursos que Docker puede dejar atrás.
+
+### Limpieza completa de Docker
+
+Para dejar el entorno totalmente limpio, borrar también contenedores, imágenes, volúmenes y redes.
+
+Primero revisamos qué hay antes de borrar nada:
+
+```bash
+docker ps -a
+docker images
+docker volume ls
+docker network ls
+```
+
+Borrado completo del entorno local de este proyecto:
+
+```bash
+docker rm -f $(docker ps -aq)
+docker rmi -f $(docker images -aq)
+docker volume prune -f
+docker network prune -f
+```
+
+Limpieza menos agresiva:
+
+```bash
+docker container prune -f
+docker image prune -a -f
+docker volume prune -f
+docker network prune -f
+```
+
+Tendremos en cuenta que los comandos anteriores pueden borrar recursos de otros proyectos si los reutilizamos en la misma instalación de Docker.
+

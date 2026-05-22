@@ -22,7 +22,7 @@ HTML_v1 = """
     </style>
 </head>
 <body>
-    <h1>🎮 Wil42 Playground</h1>
+    <h1>🎮 Mlezcano Playground</h1>
     <div class="version">🟢 VERSION 1</div>
     <div class="info">Welcome to v1 - Initial Version</div>
     <code>{"status":"ok", "message":"v1"}</code>
@@ -44,13 +44,14 @@ HTML_v2 = """
     </style>
 </head>
 <body>
-    <h1>🎮 Wil42 Playground</h1>
+    <h1>🎮 Mlezcano Playground</h1>
     <div class="version">🔵 VERSION 2</div>
     <div class="info">Welcome to v2 - Enhanced Version</div>
     <code>{"status":"ok", "message":"v2"}</code>
 </body>
 </html>
 """
+
 
 class PlaygroundHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -70,8 +71,9 @@ class PlaygroundHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         print(f"[{self.client_address[0]}] {format % args}")
 
+
 if __name__ == "__main__":
-    print(f"Starting Wil42 Playground {VERSION} on port {PORT}")
+    print(f"Starting Mlezcano Playground {VERSION} on port {PORT}")
     with socketserver.TCPServer(("", PORT), PlaygroundHandler) as httpd:
-        print(f"Server running... Press Ctrl+C to stop")
+        print("Server running... Press Ctrl+C to stop")
         httpd.serve_forever()
