@@ -23,8 +23,6 @@ Esta parte está pensada para una infraestructura mínima con los siguientes con
 
 4. [repo-dockerhub/deployment.yaml](repo-dockerhub/): carpeta con la aplicación que subimos a dockerhub para esta práctica.
 
-5. [Vagrantfile](Vagrantfile): envoltorio opcional para levantar una VM de desarrollo.
-
 
 ## Requisitos previos
 
@@ -67,16 +65,6 @@ En ambos casos usaremos el script de despliegue:
 ./scripts/install.sh
 ```
 
-**Hay un archivo Vagrant para la VM de desarrollo:**
-
-```bash
-vagrant up
-```
-
-El Vagrantfile está pensado para preparar una VM simple y luego ejecutar el script de instalación automáticamente. 
-Se ha realizado como implementación extra y aplicando lo aprendido en los niveles anteriores con fines didácticos.
-Al no ser requerido por el subject es algo simplemente opcional, aunque funciona como "envoltorio" automatizando todo (tira del mismo script igualmente).
-
 ## Qué hace el script de instalación
 
 1. Comprueba si Docker está instalado.
@@ -94,46 +82,32 @@ Al no ser requerido por el subject es algo simplemente opcional, aunque funciona
 
 ## Despliegue paso a paso
 
-### Opción A: en macOS con Docker Desktop
+1. Abrimos docker desktop o nos aseguramos que el daemon de docker esta activo.
 
-1. Abre Docker Desktop y espera a que esté listo.
-2. Abre una terminal en este directorio.
-3. Ejecuta:
+2. Abrimos una terminal en este directorio.
+
+3. Ejecutamos:
 
 ```bash
 ./scripts/install.sh
 ```
 
-4. Espera a que termine.
+4. Esperamos a que termine.
+
 5. Abre la UI de Argo CD en:
 
 ```bash
 http://localhost:8080
 ```
 
-6. Abre la aplicación en:
+6. Abrimos la aplicación en:
 
 ```bash
 http://localhost:8888
 ```
 
-### Opción B: dentro de una VM con Vagrant
 
-1. Entra en la carpeta `p3`.
-2. Arranca la VM:
-
-```bash
-vagrant up
-```
-
-3. Espera a que acabe el provisionamiento.
-4. Si necesitas acceder a la VM manualmente:
-
-```bash
-vagrant ssh mlezcanoS
-```
-
-5. Dentro de la VM puedes comprobar el estado del cluster con kubectl.
+7. Dentro de la VM podemos comprobar el estado del cluster con kubectl.
 
 ## Comprobaciones obligatorias
 
