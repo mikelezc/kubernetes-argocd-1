@@ -78,7 +78,12 @@ else
     VALUES_PATH="../confs/gitlab-values.yaml"
 fi
 
+# El chart 10.x endurece la configuración y exige Redis/PostgreSQL/Object Storage externos.
+# Para este laboratorio fijamos una versión anterior compatible con el values minimalista.
+GITLAB_CHART_VERSION="9.9.0"
+
 if ! helm upgrade --install gitlab gitlab/gitlab \
+    --version "$GITLAB_CHART_VERSION" \
     --timeout 600s \
     --namespace gitlab \
     -f "$VALUES_PATH"; then

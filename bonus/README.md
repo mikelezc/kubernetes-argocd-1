@@ -76,7 +76,7 @@ http://gitlab.local
 
 - [scripts/install.sh](scripts/install.sh): prepara la VM, levanta `iot-bonus`, instala GitLab con Helm y añade Argo CD.
 - [scripts/post-install.sh](scripts/post-install.sh): corrige ingress, espera a MinIO, crea buckets y muestra credenciales iniciales.
-- [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): automatiza la creación del proyecto `playground-demo` y sube un primer `deployment.yaml`.
+- [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): automatiza la creación del proyecto `mlezcano-gitlab-demo`, sube un primer `deployment.yaml` y devuelve la URL web del proyecto y la URL Git del repositorio.
 - [scripts/create_pat.rb](scripts/create_pat.rb): obtiene un token de API para el usuario `root`.
 - [scripts/create_proj.rb](scripts/create_proj.rb): crea el proyecto desde Ruby y publica el archivo inicial.
 - [scripts/push_initial_commit.sh](scripts/push_initial_commit.sh): empuja el commit inicial al repositorio ya creado.
@@ -132,13 +132,58 @@ vagrant ssh -c 'bash /vagrant/scripts/create-gitlab-project-and-push.sh'
 Qué demuestra:
 
 - Que GitLab está operativo.
-- Que la API responde.
 - Que es posible crear un repositorio nuevo.
 - Que se puede hacer push de un commit inicial sin errores.
+- Que el helper devuelve la URL web del proyecto y la URL del repo para copiarla en Argo CD.
 
 ### 3. La Parte 3 sigue funcionando y usa un repositorio local en GitLab
 
 Una vez creado el proyecto local, Argo CD debe apuntar a ese repo interno en lugar de a un servicio externo.
+
+#### Cómo cambiar el repo de Argo CD a GitLab local (paso a paso)
+
+1. Crea el proyecto y el primer commit en GitLab local:
+
+```bash
+cd /vagrant/scripts
+./create-gitlab-project-and-push.sh
+```
+
+2. Edita [p3/confs/argocd.yaml](../p3/confs/argocd.yaml) y cambia `spec.source.repoURL`:
+
+De:
+
+```yaml
+repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd.git'
+```
+
+A:
+
+```yaml
+repoURL: 'http://gitlab.local/root/mlezcano-gitlab-demo.git'
+```
+
+3. Aplica el manifiesto actualizado en Argo CD:
+
+```bash
+kubectl apply -f /vagrant/p3/confs/argocd.yaml
+```
+
+4. Fuerza reconciliación y comprueba que ya usa GitLab:
+
+```bash
+kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
+kubectl -n argocd get application iot-app -o jsonpath='{.spec.source.repoURL}{"\n"}'
+kubectl -n argocd get application iot-app
+```
+
+Resultado esperado:
+
+- `repoURL` debe ser `http://gitlab.local/root/mlezcano-gitlab-demo.git`.
+- `SYNC STATUS` debe pasar a `Synced`.
+- `HEALTH STATUS` debe pasar a `Healthy`.
+
+Nota: si al principio aparece `OutOfSync`, pulsa `Refresh` o `Sync` en la UI de Argo CD y espera unos segundos.
 
 Qué se revisa:
 
