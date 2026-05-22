@@ -186,31 +186,25 @@ curl http://localhost:8888/
 ```
 
 
-3. Confirmamos que la app usa Docker Hub.
-
-### Cómo comprobarlo (comandos reproducibles y evidencia para la defensa)
+3. Confirmamos que la app usa Docker Hub y repo de Github
 
 Desde el repositorio local (prueba rápida):
 
 ```bash
-# 1) Verifica el campo `image` en el manifiesto que Argo CD monitoriza
+# 1) Verificamos el campo `image` en el manifiesto que Argo CD monitoriza
 grep -n "image:" repo-github/deployment.yaml || sed -n '1,160p' repo-github/deployment.yaml
-
-# Deberías ver una línea del tipo: image: mikelezc/playground:v1
 ```
 
-En la configuración de Argo CD (confirma el repo que se está monitorizando):
+En la configuración de Argo CD (confirmamos el repo que se está monitorizando):
 
 ```bash
 grep -n "repoURL" confs/argocd.yaml || sed -n '1,120p' confs/argocd.yaml
-
-# Confirma que el repoURL apunta al repo público del grupo (ej: https://github.com/mikelezc/mlezcano-iot-argocd)
 ```
 
 Comprobación desde Docker/Docker Hub:
 
 ```bash
-# 2) Intentar descargar las imágenes públicas (prueba práctica)
+# 2) Descargamos las imágenes públicas
 docker pull mikelezc/playground:v1
 docker pull mikelezc/playground:v2
 
@@ -221,30 +215,12 @@ curl -s https://hub.docker.com/v2/repositories/mikelezc/playground/tags/ | jq '.
 Comprobación en el clúster (evidencia de que Kubernetes usa la imagen de Docker Hub):
 
 ```bash
-# 4) Mostrar la imagen usada por el Deployment en el namespace `dev`
+# 4) Imagen usada por el Deployment en el namespace `dev`
 kubectl -n dev get deployment mlezcano-playground -o jsonpath='{.spec.template.spec.containers[*].image}'; echo
 
-# 5) Mostrar imagen(es) usadas por los pods (útil si quieres capturar salida para la defensa)
+# 5) Imagen(es) usadas por los pods
 kubectl -n dev get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
 ```
-
-Recolectar evidencia (sugerencia para la defensa):
-
-- Redirige la salida de los comandos a archivos que puedas adjuntar o mostrar: por ejemplo
-
-```bash
-kubectl -n dev get deployment mlezcano-playground -o yaml > evidencia_deployment.yaml
-docker pull mikelezc/playground:v1 > evidencia_docker_pull.txt 2>&1
-curl -s https://hub.docker.com/v2/repositories/mikelezc/playground/tags/ > evidencia_dockerhub_tags.json
-```
-
-- Haz capturas de pantalla de la UI de Argo CD mostrando `Synced` y `Healthy` y del fichero `deployment.yaml` en GitHub con la línea `image: ...` visible.
-- Si necesitas una prueba legible en el examen, incluye las salidas guardadas (`evidencia_*.txt/.yaml/.json`) y la URL del repo GitHub que Argo CD está monitorizando.
-
-Opcional — script de verificación rápido
-
-Si quieres, puedo añadir un script `p3/check_evidence.sh` que ejecute los comandos clave y genere los archivos `evidencia_*` automáticamente. ¿Lo añado?
-
 
 4. Cambiamos a `v2` editando manifiesto en GitHub y hacer commit/push.
 
