@@ -235,7 +235,7 @@ Comandos útiles para validar:
 ```bash
 kubectl -n argocd get application
 kubectl -n dev get pods
-curl http://localhost:8888/
+	curl http://localhost:8889/
 ```
 
 ### 4. Validación final del bonus

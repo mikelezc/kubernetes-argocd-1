@@ -50,7 +50,7 @@ progress_step "3/6" "Creando el cluster k3d iot-bonus"
 # Creamos el cluster k3d
 k3d cluster delete iot-bonus || true
 # Importante: añadimos puertos extras para gitlab (80, 443, 22)
-k3d cluster create iot-bonus --api-port 6550 -p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "8080:8080@loadbalancer" -p "8888:8888@loadbalancer"
+k3d cluster create iot-bonus --api-port 6550 -p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "8080:8080@loadbalancer" -p "8888:30080@server:0"
 
 # Dejamos el kubeconfig disponible para futuras sesiones de vagrant ssh
 mkdir -p /home/vagrant/.kube
