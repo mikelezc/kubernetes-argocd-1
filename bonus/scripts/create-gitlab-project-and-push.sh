@@ -7,6 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
+HOST_IP="192.168.56.111"
 
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
   if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
@@ -22,11 +23,13 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
 
-GITLAB_URL="http://gitlab.local"
+GITLAB_URL="http://gitlab.${HOST_IP}.nip.io"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
 ARGO_REPO_URL="http://gitlab-webservice-default.gitlab.svc:8181/${PROJECT_FULL_PATH}.git"
+ARGO_PUBLIC_HOST="localhost"
+ARGO_PUBLIC_URL="http://${ARGO_PUBLIC_HOST}:8081"
 K3D_CLUSTER_NAME="iot-bonus"
 BRAND_IMAGE_TAG="mlezcano/playground:gitlab-badge"
 PROJECT_URL=""
@@ -171,6 +174,9 @@ spec:
       - name: mlezcano-playground
         image: ${BRAND_IMAGE_TAG}
         imagePullPolicy: IfNotPresent
+        env:
+        - name: VERSION
+          value: "v2"
         ports:
         - containerPort: 8888
 ---
@@ -319,19 +325,7 @@ EOF
 }
 
 start_playground_port_forward() {
-  local pf_pidfile="/tmp/mlezcano-playground-portforward.pid"
-  local pf_log="/tmp/mlezcano-playground-portforward.log"
-
-  if [ -f "$pf_pidfile" ] && kill -0 "$(cat "$pf_pidfile")" >/dev/null 2>&1; then
-  kill "$(cat "$pf_pidfile")" >/dev/null 2>&1 || true
-  fi
-
-  pkill -f 'kubectl .*port-forward .*mlezcano-playground.*9999:8888' >/dev/null 2>&1 || true
-
   kubectl -n dev wait --for=condition=available deployment/mlezcano-playground --timeout=180s >/dev/null
-  nohup kubectl -n dev port-forward svc/mlezcano-playground 9999:8888 --address 0.0.0.0 >"$pf_log" 2>&1 &
-  echo $! > "$pf_pidfile"
-  sleep 2
 }
 
 push_commit() {
@@ -390,6 +384,35 @@ spec:
 EOF
 }
 
+configure_argocd_ingress() {
+  kubectl -n argocd apply -f - >/dev/null <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: ${ARGO_PUBLIC_HOST}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+EOF
+}
+
+configure_argocd_insecure() {
+  kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"server.insecure":"true"}}' >/dev/null
+  kubectl -n argocd rollout restart deployment argocd-server >/dev/null
+  kubectl -n argocd rollout status deployment argocd-server --timeout=180s >/dev/null
+}
+
 refresh_argocd() {
   kubectl -n argocd rollout restart deployment argocd-repo-server >/dev/null
   kubectl -n argocd rollout status deployment argocd-repo-server --timeout=180s >/dev/null
@@ -419,6 +442,8 @@ print_next_steps() {
 URL del proyecto: ${PROJECT_URL}
 Repositorio creado: ${PROJECT_REPO_URL}
 URL interna para Argo CD: ${ARGO_REPO_URL}
+URL pública de GitLab: ${GITLAB_URL}
+URL pública de Argo CD: ${ARGO_PUBLIC_URL}
 Web del bonus: http://localhost:8889/
 EOF
 }
@@ -441,6 +466,8 @@ log "5/6" "Creando commit inicial y empujando a main..."
 push_commit
 log "6/6" "Configurando Argo CD con el repo privado y la Application..."
 configure_argocd_repo
+configure_argocd_insecure
+configure_argocd_ingress
 configure_argocd_application
 refresh_argocd
 start_playground_port_forward

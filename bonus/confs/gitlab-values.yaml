@@ -3,7 +3,7 @@
 global:
   edition: ce
   hosts:
-    domain: local
+    domain: 192.168.56.111.nip.io
     https: false
 installCertmanager: false
 certmanager-issuer:
