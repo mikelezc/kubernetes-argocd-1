@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Crea un proyecto en el GitLab local y sube un demo inicial con identidad propia.
-# Se puede lanzar desde el host: el script se re-ejecuta dentro de la VM si hace falta.
+# Este script crea un proyecto en el GitLab local y pushea un commit inicial con un manifiesto de Kubernetes.
+# Luego configura Argo CD para usar ese repo privado y despliega la aplicación de ejemplo.
+# El script detecta si se está ejecutando dentro de la VM y, si no, intenta reejecutarse dentro de la VM usando Vagrant.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -211,7 +212,7 @@ Contiene:
 - `README.md`: nota visible para distinguir esta demo en GitLab.
 
 La imagen usada es `mlezcano/playground:gitlab-badge` y muestra una insignia visible
-de `Subido a GitLab` para dejar claro que la app viene del flujo local.
+de `Subido a GitLab` para dejar claro que la app viene de este flujo local.
 EOF
 }
 

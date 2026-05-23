@@ -8,7 +8,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd.git'
+    #repoURL: 'https://github.com/mikelezc/mlezcano-iot-argocd.git'
+    repoURL: 'http://gitlab.local/root/mlezcano-gitlab-demo.git'
     targetRevision: main
     path: '.'
   destination:

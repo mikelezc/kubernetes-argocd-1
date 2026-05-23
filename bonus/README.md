@@ -23,9 +23,9 @@ GitLab es pesado y tiene bastantes dependencias: base de datos, Redis, webservic
 
 2. [confs/gitlab-values.yaml](confs/gitlab-values.yaml): valores de Helm para el despliegue reducido de GitLab.
 
-3. [scripts/install.sh](scripts/install.sh): instala Docker, kubectl, k3d, Helm, crea el clúster y despliega GitLab + Argo CD.
+3. [scripts/install.sh](scripts/install.sh): instala Docker, kubectl, k3d, Helm, crea el clúster y deja GitLab + Argo CD listos en un único flujo.
 
-4. [scripts/post-install.sh](scripts/post-install.sh): aplica los ajustes posteriores al despliegue, como ingress, MinIO y credenciales.
+4. [scripts/post-install.sh](scripts/post-install.sh): script heredado y ya no usado por `vagrant up`.
 
 
 ## Requisitos Previos
@@ -47,20 +47,16 @@ Durante el arranque se hace lo siguiente:
 - Se crea el clúster `iot-bonus`.
 - Se instala GitLab mediante Helm usando [confs/gitlab-values.yaml](confs/gitlab-values.yaml).
 - Se instala Argo CD en el namespace `argocd`.
-- Se ejecuta [scripts/post-install.sh](scripts/post-install.sh) para dejar GitLab listo.
+- Se ejecuta un único provisioner: [scripts/install.sh](scripts/install.sh), que termina el despliegue y aplica la configuración final.
 
 ## Acceso a GitLab
 
-La VM expone GitLab en `gitlab.local`. Debemos asociar ese nombre a la IP privada de la VM en /etc/hosts
-
-```bash
-echo "192.168.56.111 gitlab.local" | sudo tee -a /etc/hosts
-```
+La VM expone GitLab en `gitlab.192.168.56.111.nip.io`, que resuelve sin tocar `/etc/hosts`.
 
 Después podemos comprobar la UI de GitLab:
 
 ```text
-http://gitlab.local
+http://gitlab.192.168.56.111.nip.io
 ```
 
 ## Flujo de Trabajo
@@ -74,8 +70,8 @@ http://gitlab.local
 
 ## Qué Hace Cada Script
 
-- [scripts/install.sh](scripts/install.sh): prepara la VM, levanta `iot-bonus`, instala GitLab con Helm y añade Argo CD.
-- [scripts/post-install.sh](scripts/post-install.sh): corrige ingress, espera a MinIO, crea buckets y muestra credenciales iniciales.
+- [scripts/install.sh](scripts/install.sh): prepara la VM, levanta `iot-bonus`, instala GitLab con Helm, añade Argo CD y aplica los ajustes finales.
+- [scripts/post-install.sh](scripts/post-install.sh): heredado; conserva la lógica antigua para referencia manual.
 - [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): automatiza la creación del proyecto `mlezcano-gitlab-demo`, sube un primer `deployment.yaml` y devuelve la URL web del proyecto y la URL Git del repositorio.
 - [scripts/create_pat.rb](scripts/create_pat.rb): obtiene un token de API para el usuario `root`.
 - [scripts/create_proj.rb](scripts/create_proj.rb): crea el proyecto desde Ruby y publica el archivo inicial.
@@ -94,7 +90,7 @@ Qué deberías ver:
 
 - Pods de GitLab en `Running` cuando el despliegue termine.
 - Pods de Argo CD en `Running` en el namespace `argocd`.
-- Servicios de GitLab expuestos dentro del clúster y accesibles por `gitlab.local`.
+- Servicios de GitLab expuestos dentro del clúster y accesibles por `gitlab.192.168.56.111.nip.io`.
 
 ## Limpieza y Destrucción
 
@@ -113,7 +109,7 @@ Los ficheros relevantes son [Vagrantfile](Vagrantfile) y [confs/gitlab-values.ya
 - [Vagrantfile](Vagrantfile): define la VM, la red privada, la memoria, las CPU y los provisioners automáticos.
 - [confs/gitlab-values.yaml](confs/gitlab-values.yaml): reduce el despliegue de GitLab a una configuración más ligera para el laboratorio.
 - [scripts/install.sh](scripts/install.sh): realiza la instalación base del entorno.
-- [scripts/post-install.sh](scripts/post-install.sh): aplica los parches y ajustes finales.
+- [scripts/post-install.sh](scripts/post-install.sh): referencia heredada del flujo antiguo.
 - [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea un repositorio en GitLab y sube el primer commit.
 - [scripts/create_pat.rb](scripts/create_pat.rb): genera el token de acceso necesario para automatizar acciones sobre GitLab.
 - [scripts/create_proj.rb](scripts/create_proj.rb): alternativa Ruby para crear el proyecto y el contenido inicial.

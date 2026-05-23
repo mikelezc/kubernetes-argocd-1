@@ -312,4 +312,4 @@ docker volume prune -f
 docker network prune -f
 ```
 
-Nota: estas limpiezas pueden borrar recursos de otros proyectos si comparten la misma instalacion Docker.
+Nota: estos comandos pueden borrar recursos de otros proyectos si comparten la misma instalacion Docker.
