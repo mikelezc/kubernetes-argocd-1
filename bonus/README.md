@@ -27,7 +27,7 @@ dos razones:
   El Argo CD de p3, que corre en un clúster distinto en el host, no puede resolver esa
   dirección. Hacerlo funcionar requeriría bindear el port-forwarding de Vagrant en
   `0.0.0.0` y depender de `host.k3d.internal`, una solución frágil y dependiente del
-  entorno del evaluador.
+  entorno de despliegue.
 - **Recursos**: GitLab necesita 8 GB de RAM. El subject especifica que el bonus debe
   contener `"everything needed so your entire cluster works"`, lo que implica un entorno
   autosuficiente, no una extensión frágil del de p3.
@@ -37,7 +37,7 @@ el namespace `dev`), solo cambia la fuente: GitHub → GitLab local.
 
 ## Atención: requerimientos de sistema
 
-GitLab es pesado. La VM reserva 8 GB de RAM y 3 CPU para evitar errores por falta
+GitLab es muy pesado. La VM reserva 8 GB de RAM y 3 CPU para evitar errores por falta
 de memoria. El arranque tardará varios minutos la primera vez.
 
 ## Carpetas del módulo Bonus
@@ -73,8 +73,8 @@ Qué hace internamente [scripts/install.sh](scripts/install.sh):
 - Parchea los Ingress de GitLab para usar traefik.
 - Inicializa los buckets de MinIO que necesita GitLab.
 - Despliega Argo CD en el namespace `argocd`.
-- Configura reconciliación rápida (5s) en Argo CD.
-- Habilita el modo HTTP (insecure) y crea el Ingress de Argo CD.
+- Configura reconciliación rápida (5 segundos) en Argo CD.
+- Habilita el modo HTTP y crea el Ingress de Argo CD.
 - Imprime la contraseña inicial de GitLab y los próximos pasos.
 
 Al terminar, GitLab está listo pero Argo CD todavía no tiene ninguna Application.
@@ -93,7 +93,7 @@ O desde dentro de la VM:
 vagrant ssh -c 'bash /vagrant/scripts/create-gitlab-project-and-push.sh'
 ```
 
-Qué hace:
+Qué hace?
 
 1. Espera a que el pod webservice de GitLab esté listo.
 2. Crea el proyecto `mlezcano-gitlab-demo` bajo el usuario `root`.
@@ -133,12 +133,12 @@ Credenciales Argo CD: `admin` / contraseña impresa por `connect-argocd-to-gitla
 Una vez completados los tres pasos, el flujo GitOps está activo. Para demostrar
 el ciclo completo (equivalente a lo que se hace en la Parte 3 con GitHub):
 
-1. Abre GitLab en `http://gitlab.localhost:8081/root/mlezcano-gitlab-demo`.
-2. Edita `deployment.yaml` directamente en la UI de GitLab.
-3. Cambia la imagen de `mikelezc/playground:v1` a `mikelezc/playground:v2`.
-4. Haz commit en `main`.
+1. Abrimos GitLab en `http://gitlab.localhost:8081/root/mlezcano-gitlab-demo`.
+2. Editamos `deployment.yaml` directamente en la UI de GitLab.
+3. Cambiamos la imagen de `mikelezc/playground:v1` a `mikelezc/playground:v2`.
+4. Hacemos commit en `main`.
 5. Argo CD detecta el cambio en menos de 10 segundos y sincroniza.
-6. Verifica el resultado:
+6. Verificamos el resultado:
 
 ```bash
 curl http://localhost:8889/
@@ -176,7 +176,7 @@ Estado esperado cuando todo está correcto:
 
 ## Forzar sincronización manual
 
-Si necesitas que Argo CD sincronice inmediatamente sin esperar el intervalo de 5s:
+Si necesitamos que Argo CD sincronice inmediatamente sin esperar el intervalo de tiempo que tarda en "enterarse" del cambio:
 
 ```bash
 kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
@@ -187,31 +187,3 @@ kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard -
 ```bash
 vagrant destroy -f
 ```
-
-## Puntos clave para la corrección
-
-### GitLab funciona y acepta repositorios
-
-```bash
-vagrant ssh -c 'bash /vagrant/scripts/create-gitlab-project-and-push.sh'
-```
-
-Demuestra que GitLab está operativo, que se pueden crear repositorios y que el
-push funciona correctamente.
-
-### Argo CD sincroniza desde GitLab local
-
-```bash
-kubectl -n argocd get application iot-app -o jsonpath='{.spec.source.repoURL}{"\n"}'
-```
-
-Resultado esperado:
-
-```
-http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git
-```
-
-### El flujo GitOps funciona de extremo a extremo
-
-- Cambiar `deployment.yaml` en GitLab → commit → Argo CD sincroniza → la app se actualiza.
-- Verificar con `curl http://localhost:8889/` que la versión cambia de `v1` a `v2`.

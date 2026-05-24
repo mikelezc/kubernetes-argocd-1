@@ -23,7 +23,7 @@ spec:
         imagePullPolicy: IfNotPresent
         env:
         - name: VERSION
-          value: "v1"
+          value: "v1" # esta es la variable que cambiaremos para la demostración de la actualización de la aplicación (v1 ó v2)
         ports:
         - containerPort: 8888
 ---
