@@ -1,8 +1,6 @@
 #!/bin/bash
-# bonus/scripts/install.sh
-# Responsabilidad: instalar herramientas, crear cluster k3d iot-bonus,
-# desplegar GitLab (namespace gitlab) y Argo CD (namespace argocd).
-# NO configura ninguna Application de Argo CD — eso lo hace connect-argocd-to-gitlab.sh
+# Este script instala herramientas, crear cluster k3d iot-bonus,
+# desplegará GitLab (namespace gitlab) y Argo CD (namespace argocd).
 
 set -e
 
@@ -209,6 +207,7 @@ echo "=================== Instalación completada ================="
 echo "============================================================"
 echo ""
 echo "GitLab:    http://gitlab.localhost:8081"
+echo ""
 echo "  usuario:    root"
 if [ -n "$DECODED" ]; then
     echo "  contraseña: $DECODED"
@@ -217,11 +216,24 @@ else
     echo "               -o jsonpath='{.data.password}' | base64 -d"
 fi
 echo ""
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
+    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
+
 echo "Argo CD:   http://localhost:8081  (sin Application aún)"
 echo ""
+echo "  usuario:    admin"
+if [ -n "$ARGOCD_PASSWORD" ]; then
+    echo "  contraseña: $ARGOCD_PASSWORD"
+else
+    echo "  contraseña: kubectl -n argocd get secret argocd-initial-admin-secret \\"
+    echo "               -o jsonpath='{.data.password}' | base64 -d"
+fi
+echo ""
 echo "Próximos pasos:"
+echo ""
 echo "  1. Crear repositorio en GitLab y hacer push del manifiesto:"
 echo "       ./scripts/create-gitlab-project-and-push.sh"
+echo ""
 echo "  2. Conectar Argo CD al repositorio GitLab:"
 echo "       ./scripts/connect-argocd-to-gitlab.sh"
 echo ""

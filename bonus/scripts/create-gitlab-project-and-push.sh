@@ -1,7 +1,6 @@
 #!/bin/bash
-# bonus/scripts/create-gitlab-project-and-push.sh
-# Responsabilidad: crear el proyecto en GitLab, generar un PAT y hacer push
-# del manifiesto inicial. NO toca la configuración de Argo CD.
+# Script para crear el proyecto en GitLab, generar un PAT y hacer push
+# del manifiesto inicial.
 
 set -euo pipefail
 

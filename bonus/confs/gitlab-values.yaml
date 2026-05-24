@@ -1,20 +1,19 @@
-# gitlab-values.yaml
-# Configuración "mega-light" de GitLab en Kubernetes.
+# Configuración "mega-ligera" de GitLab en Kubernetes.
 # Esta configuración es la que será utilizada por Helm para desplegar GitLab en el cluster de Kubernetes.
 global:
-  edition: ce               # Community Edition
+  edition: ce                   # Community Edition (evita la versión enterprise)
   hosts:
     domain: localhost
     https: false
 installCertmanager: false
 certmanager-issuer:
-  email: admin@gitlab.local 
+  email: admin@gitlab.local     # aunque no lo usaremos porque no habilitamos HTTPS, evita un error de TLS al instalar cert-manager
 nginx-ingress:
-  enabled: false
+  enabled: false                # suele instalar nginx por defecto. Entra en conflicto con traefik
 prometheus:
-  install: false
+  install: false                # instala por defecto prometheus, pero no lo necesitamos y son +2 GB RAM
 gitlab-runner:
-  install: false
+  install: false                # instala por defecto gitlab-runner, pero no lo necesitamos evitamos +1 GB RAM
 gitlab:
   webservice:
     minReplicas: 1
@@ -25,16 +24,16 @@ gitlab:
   gitlab-shell:
     minReplicas: 1
     maxReplicas: 1
-  minio:
-    image:
-      repository: minio/minio
-      tag: latest
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 200m
-        memory: 512Mi
+  # minio:
+  #   image:
+  #     repository: minio/minio
+  #     tag: latest
+  #   resources:
+  #     requests:
+  #       cpu: 100m
+  #       memory: 256Mi
+  #     limits:
+  #       cpu: 200m
+  #       memory: 512Mi
 registry:
   enabled: false

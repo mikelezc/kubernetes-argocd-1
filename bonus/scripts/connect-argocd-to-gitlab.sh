@@ -1,7 +1,6 @@
 #!/bin/bash
-# bonus/scripts/connect-argocd-to-gitlab.sh
-# Responsabilidad: registrar el repo GitLab local en Argo CD y crear la
-# Application que sincroniza los manifests hacia el namespace dev.
+# Con este script, registramos el repo GitLab local en Argo CD y creamos la
+# aplicación que sincroniza los manifests hacia el namespace dev.
 # Debe ejecutarse DESPUÉS de create-gitlab-project-and-push.sh.
 
 set -euo pipefail
