@@ -11,7 +11,6 @@ KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
 
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
   if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
-    echo "No estoy dentro de la VM. Reejecutando el helper con Vagrant..."
     cd "$BONUS_ROOT"
     BONUS_INSIDE_VM=1 vagrant ssh -c 'cd /vagrant && BONUS_INSIDE_VM=1 bash /vagrant/scripts/create-gitlab-project-and-push.sh'
     exit $?
@@ -23,15 +22,23 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
 
-GITLAB_URL="http://gitlab.localhost"
+GITLAB_PUBLIC_HOST="localhost"
+GITLAB_PUBLIC_PORT="8081"
+GITLAB_PUBLIC_URL="http://${GITLAB_PUBLIC_HOST}:${GITLAB_PUBLIC_PORT}"
+GITLAB_URL="${GITLAB_PUBLIC_URL}"
+GITLAB_VM_URL="http://gitlab.localhost"
+GITLAB_CLUSTER_BASE_URL="http://gitlab-webservice-default.gitlab.svc:8181"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
-ARGO_REPO_URL="http://gitlab-webservice-default.gitlab.svc:8181/${PROJECT_FULL_PATH}.git"
+PROJECT_URL_PUBLIC="${GITLAB_PUBLIC_URL}/${PROJECT_FULL_PATH}"
+PROJECT_REPO_URL_PUSH="${GITLAB_VM_URL}/${PROJECT_FULL_PATH}.git"
+PROJECT_REPO_URL_INTERNAL="${GITLAB_CLUSTER_BASE_URL}/${PROJECT_FULL_PATH}.git"
+ARGO_REPO_URL="${PROJECT_REPO_URL_INTERNAL}"
 ARGO_PUBLIC_HOST="localhost"
 ARGO_PUBLIC_URL="http://${ARGO_PUBLIC_HOST}:8081"
 K3D_CLUSTER_NAME="iot-bonus"
-BRAND_IMAGE_TAG="mlezcano/playground:gitlab-badge"
+PLAYGROUND_IMAGE="mikelezc/playground:v2"
 PROJECT_URL=""
 PROJECT_REPO_URL=""
 GITLAB_PAT_NAME="mlezcano-argo"
@@ -41,16 +48,8 @@ log() {
 }
 
 wait_for_gitlab_ui() {
-  log "1/6" "Esperando GitLab disponible en ${GITLAB_URL}..."
-  for _ in $(seq 1 60); do
-    if curl -fsS "${GITLAB_URL}/users/sign_in" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 3
-  done
-
-  echo "GitLab no respondió a tiempo. Revisa que la VM siga levantada y que el namespace gitlab esté Ready."
-  exit 1
+  log "1/6" "Esperando GitLab disponible dentro del clúster..."
+  kubectl -n gitlab wait --for=condition=ready pod -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
 }
 
 create_gitlab_pat() {
@@ -137,8 +136,8 @@ RUBY
     exit 1
   fi
 
-  PROJECT_URL="$project_web_url"
-  PROJECT_REPO_URL="$project_repo_url"
+  PROJECT_URL="$PROJECT_URL_PUBLIC"
+  PROJECT_REPO_URL="$PROJECT_REPO_URL_PUSH"
   export PROJECT_URL
   export PROJECT_REPO_URL
 }
@@ -172,7 +171,7 @@ spec:
     spec:
       containers:
       - name: mlezcano-playground
-        image: ${BRAND_IMAGE_TAG}
+        image: ${PLAYGROUND_IMAGE}
         imagePullPolicy: IfNotPresent
         env:
         - name: VERSION
@@ -210,118 +209,14 @@ Contiene:
 - `deployment.yaml`: manifiesto de Kubernetes para la demo.
 - `README.md`: nota visible para distinguir esta demo en GitLab.
 
-La imagen usada es `mlezcano/playground:gitlab-badge` y muestra una insignia visible
-de `Subido a GitLab` para dejar claro que la app viene de este flujo local.
+La imagen usada es `mikelezc/playground:v2`, la misma que se publica y valida en la Parte 3.
 EOF
 }
 
-build_brand_image() {
-  local build_dir
-  build_dir=$(mktemp -d)
-
-  cat > "$build_dir/Dockerfile" <<'EOF'
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY app.py /app/
-EXPOSE 8888
-CMD ["python", "/app/app.py"]
-EOF
-
-  cat > "$build_dir/app.py" <<'EOF'
-#!/usr/bin/env python3
-import http.server
-import json
-import os
-import socketserver
-
-PORT = 8888
-VERSION = os.environ.get("VERSION", "v1")
-BRAND = os.environ.get("BRAND", "Subido a GitLab")
-
-
-def build_badge() -> str:
-  return f'<div class="badge">{BRAND}</div>' if BRAND else ""
-
-
-HTML_V1 = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Playground - v1</title>
-  <style>
-    body {{ font-family: Arial; text-align: center; margin-top: 50px; background: #e8f5e9; }}
-    h1 {{ color: #2e7d32; }}
-    .version {{ font-size: 48px; color: #1b5e20; font-weight: bold; margin: 20px; }}
-    .info {{ color: #555; margin-top: 20px; font-size: 18px; }}
-    code {{ background: #f0f0f0; padding: 10px; display: inline-block; }}
-    .badge {{ display: inline-block; margin-top: 14px; padding: 8px 14px; border-radius: 999px; background: #1b5e20; color: white; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }}
-  </style>
-</head>
-<body>
-  <h1>🎮 Mlezcano Playground</h1>
-  {build_badge()}
-  <div class="version">🟢 VERSION 1</div>
-  <div class="info">Welcome to v1 - Initial Version</div>
-  <code>{{"status":"ok", "message":"v1"}}</code>
-</body>
-</html>
-"""
-
-
-HTML_V2 = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Playground - v2</title>
-  <style>
-    body {{ font-family: Arial; text-align: center; margin-top: 50px; background: #e3f2fd; }}
-    h1 {{ color: #1565c0; }}
-    .version {{ font-size: 48px; color: #0d47a1; font-weight: bold; margin: 20px; }}
-    .info {{ color: #555; margin-top: 20px; font-size: 18px; }}
-    code {{ background: #f0f0f0; padding: 10px; display: inline-block; }}
-    .badge {{ display: inline-block; margin-top: 14px; padding: 8px 14px; border-radius: 999px; background: #0d47a1; color: white; font-size: 14px; font-weight: bold; letter-spacing: 0.5px; }}
-  </style>
-</head>
-<body>
-  <h1>🎮 Mlezcano Playground</h1>
-  {build_badge()}
-  <div class="version">🔵 VERSION 2</div>
-  <div class="info">Welcome to v2 - Enhanced Version</div>
-  <code>{{"status":"ok", "message":"v2"}}</code>
-</body>
-</html>
-"""
-
-
-class PlaygroundHandler(http.server.SimpleHTTPRequestHandler):
-  def do_GET(self):
-    if self.path == "/" or self.path == "":
-      self.send_response(200)
-      self.send_header("Content-type", "text/html; charset=utf-8")
-      self.end_headers()
-      html = HTML_V2 if VERSION == "v2" else HTML_V1
-      self.wfile.write(html.encode("utf-8"))
-    else:
-      self.send_response(200)
-      self.send_header("Content-type", "application/json")
-      self.end_headers()
-      self.wfile.write(json.dumps({"status": "ok", "message": VERSION}).encode())
-
-  def log_message(self, format, *args):
-    print(f"[{self.client_address[0]}] {format % args}")
-
-
-if __name__ == "__main__":
-  print(f"Starting Mlezcano Playground {VERSION} on port {PORT}")
-  with socketserver.TCPServer(("", PORT), PlaygroundHandler) as httpd:
-    print("Server running... Press Ctrl+C to stop")
-    httpd.serve_forever()
-EOF
-
-  sudo docker build -t "$BRAND_IMAGE_TAG" "$build_dir" >/dev/null
-  sudo k3d image import --mode direct "$BRAND_IMAGE_TAG" -c "$K3D_CLUSTER_NAME" >/dev/null
-  rm -rf "$build_dir"
+ensure_playground_image() {
+  if ! sudo docker image inspect "$PLAYGROUND_IMAGE" >/dev/null 2>&1; then
+    sudo docker pull "$PLAYGROUND_IMAGE" >/dev/null
+  fi
 }
 
 start_playground_port_forward() {
@@ -427,25 +322,13 @@ print_next_steps() {
 ============================================================
 
 Puedes acceder a Argo CD en: ${ARGO_PUBLIC_URL}
-    - usuario: admin"
-	- contraseña: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+    - usuario: admin
+  - contraseña: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
 
-Puedes acceder a GitLab en: ${GITLAB_URL}
-	- usuario: root
-	- contraseña: $(kubectl -n gitlab get secret gitlab-initial-root-password -o jsonpath="{.data.password}" | base64 -d)
-
-Puedes aacceder al repositorio del proyecto en GitLab en: ${PROJECT_URL}
+Puedes acceder al repositorio de GitLab en: ${PROJECT_URL}
 
 Puedes acceder a la aplicación en: http://localhost:8889
 
-
-
-URL del proyecto: ${PROJECT_URL}
-Repositorio creado: ${PROJECT_REPO_URL}
-URL interna para Argo CD: ${ARGO_REPO_URL}
-URL pública de GitLab: ${GITLAB_URL}
-URL pública de Argo CD: ${ARGO_PUBLIC_URL}
-Web del bonus: http://localhost:8889/
 EOF
 }
 
@@ -460,7 +343,7 @@ trap cleanup EXIT
 wait_for_gitlab_ui
 ensure_project
 create_gitlab_pat
-build_brand_image
+ensure_playground_image
 log "4/6" "Proyecto listo: ${PROJECT_URL}"
 write_repo_files
 log "5/6" "Creando commit inicial y empujando a main..."
