@@ -51,12 +51,12 @@ Durante el arranque se hace lo siguiente:
 
 ## Acceso a GitLab
 
-La VM expone GitLab en `gitlab.192.168.56.111.nip.io`, que resuelve sin tocar `/etc/hosts`.
+La VM expone GitLab en `gitlab.localhost:8081`, que resuelve en loopback sin tocar `/etc/hosts`.
 
 Después podemos comprobar la UI de GitLab:
 
 ```text
-http://gitlab.192.168.56.111.nip.io
+http://gitlab.localhost:8081
 ```
 
 ## Flujo de Trabajo
@@ -90,7 +90,7 @@ Qué deberías ver:
 
 - Pods de GitLab en `Running` cuando el despliegue termine.
 - Pods de Argo CD en `Running` en el namespace `argocd`.
-- Servicios de GitLab expuestos dentro del clúster y accesibles por `gitlab.192.168.56.111.nip.io`.
+- Servicios de GitLab expuestos dentro del clúster y accesibles por `gitlab.localhost:8081`.
 
 ## Limpieza y Destrucción
 

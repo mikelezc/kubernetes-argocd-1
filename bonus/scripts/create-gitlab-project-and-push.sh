@@ -8,7 +8,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
-HOST_IP="192.168.56.111"
 
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
   if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
@@ -24,7 +23,7 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
 
-GITLAB_URL="http://gitlab.${HOST_IP}.nip.io"
+GITLAB_URL="http://gitlab.localhost"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
@@ -63,7 +62,7 @@ create_gitlab_pat() {
     exit 1
   fi
 
-  log "2/6" "Creando token de acceso de GitLab para Git y Argo CD..."
+  log "3/6" "Creando token de acceso de GitLab para Git y Argo CD..."
   pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- gitlab-rails runner - <<'RUBY' 2>/dev/null || true
 user = User.find_by_username('root')
 user.personal_access_tokens.where(name: 'mlezcano-argo').delete_all
@@ -108,7 +107,7 @@ ensure_project() {
     exit 1
   fi
 
-  log "3/6" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
+  log "2/6" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
   project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- gitlab-rails runner - <<'RUBY' 2>/dev/null || true
 user = User.find_by_username('root')
 project = Project.find_by_full_path('root/mlezcano-gitlab-demo')
@@ -420,25 +419,26 @@ refresh_argocd() {
   kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite >/dev/null
 }
 
-print_argocd_login() {
-  cat <<'EOF'
-Si la UI de Argo CD te pide usuario y contraseña, eso es el login de Argo CD,
-no las credenciales de GitLab.
-
-Usuario: admin
-Contraseña inicial:
-  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
-EOF
-}
-
 print_next_steps() {
   cat <<EOF
 
-=== Siguiente paso para la corrección ===
-1. Fuerza Refresh o Sync en Argo CD.
-2. Valida la app con:
-  curl http://localhost:8889/
-5. Cambia VERSION a v2 en el repo de GitLab y repite el push para mostrar la reconcilación.
+============================================================
+=================== Instalación completada =================
+============================================================
+
+Puedes acceder a Argo CD en: ${ARGO_PUBLIC_URL}
+    - usuario: admin"
+	- contraseña: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+
+Puedes acceder a GitLab en: ${GITLAB_URL}
+	- usuario: root
+	- contraseña: $(kubectl -n gitlab get secret gitlab-initial-root-password -o jsonpath="{.data.password}" | base64 -d)
+
+Puedes aacceder al repositorio del proyecto en GitLab en: ${PROJECT_URL}
+
+Puedes acceder a la aplicación en: http://localhost:8889
+
+
 
 URL del proyecto: ${PROJECT_URL}
 Repositorio creado: ${PROJECT_REPO_URL}
@@ -473,5 +473,4 @@ configure_argocd_application
 refresh_argocd
 start_playground_port_forward
 log "6/6" "Proyecto, repo privado de Argo CD y Application creados correctamente."
-print_argocd_login
 print_next_steps
