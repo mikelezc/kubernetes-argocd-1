@@ -151,6 +151,12 @@ echo "Esperando Argo CD server..."
 kubectl -n argocd wait --for=condition=ready pod \
     -l app.kubernetes.io/name=argocd-server --timeout=300s >/dev/null
 
+echo "Ajustando reconciliación a 5s..."
+kubectl -n argocd patch configmap argocd-cm \
+    --type merge -p '{"data":{"timeout.reconciliation":"5s","timeout.reconciliation.jitter":"0s"}}' >/dev/null
+kubectl -n argocd rollout restart statefulset/argocd-application-controller >/dev/null
+kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=180s >/dev/null
+
 echo "Habilitando modo HTTP (insecure)..."
 kubectl -n argocd patch configmap argocd-cmd-params-cm \
     --type merge -p '{"data":{"server.insecure":"true"}}' >/dev/null
