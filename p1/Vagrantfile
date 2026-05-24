@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # CONFIGURACIÓN CROSS-PLATFORM (CAMPUS 42 vs MAC M4 USADO PARA DESARROLLO)
+  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
   # Determinamos la arquitectura del sistema donde se ejecuta:
   if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')

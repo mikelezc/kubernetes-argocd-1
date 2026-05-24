@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # CONFIGURACIÓN CROSS-PLATFORM (CAMPUS 42 vs MAC M4 USADO PARA DESARROLLO)
+  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
   is_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
   provider = ENV['VAGRANT_DEFAULT_PROVIDER']
@@ -12,26 +12,27 @@ Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-22.04"
 
   # ==========================================
-  # CONFIGURACIÓN BONUS
+  # CONFIGURACIÓN DE LA MÁQUINA VIRTUAL (MEMORIA, CPU)
   # ==========================================
   config.vm.provider provider do |v|
-    # ¡GitLab oficial recomienda mínimo 4 GB! Usamos 8GB para evitar OOMs en Kubernetes.
     if provider == "virtualbox" || provider == "parallels"
       v.memory = 8192
       v.cpus = 3
-    elsif provider == "vmware_desktop"
+    elsif provider == "vmware_desktop"	#vmware_desktop: compatible con Mac
       v.vmx["memsize"] = "8192"
       v.vmx["numvcpus"] = "3"
-      v.vmx["cpuid.coresPerSocket"] = "1"
+      v.vmx["cpuid.coresPerSocket"] = "1" # Para evitar problemas con VMware, configuramos 1 core por socket.
     end
   end
 
   # ==========================================
-  # MÁQUINA DE DESPLIEGUE BONUS
+  # CONFIGURACIÓN DE LA MÁQUINA VIRTUAL (HOSTNAME, IP, PORTS)
   # ==========================================
   config.vm.define "mlezcanoS" do |server|
     server.vm.hostname = "mlezcanoS"
     server.vm.network "private_network", ip: "192.168.56.111"
+    server.vm.network "forwarded_port", guest: 8888, host: 8889, host_ip: "127.0.0.1", auto_correct: false
+    server.vm.network "forwarded_port", guest: 80, host: 8081, host_ip: "127.0.0.1", auto_correct: false
 
     server.vm.provider provider do |v|
       if provider == "virtualbox" || provider == "parallels"
@@ -41,8 +42,7 @@ Vagrant.configure("2") do |config|
       end
     end
     
-    # En bonus el script de install debe instalar Docker, K3d, GitLab y ArgoCD.
+    # Provisionamiento: Ejecutamos el script de instalación con privilegios de administrador.
     server.vm.provision "shell", path: "scripts/install.sh", privileged: true
-    server.vm.provision "shell", path: "scripts/post-install.sh", privileged: true
   end
 end

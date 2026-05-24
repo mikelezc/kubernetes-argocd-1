@@ -1,239 +1,177 @@
 #!/bin/bash
-set -euo pipefail
+# Script para crear el proyecto en GitLab, generar un PAT y hacer push
+# del manifiesto inicial.
 
-# Crea un proyecto en el GitLab local y sube un demo inicial con identidad propia.
-# Se puede lanzar desde el host: el script se re-ejecuta dentro de la VM si hace falta.
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
+PAT_FILE="/tmp/.gitlab-pat"
 
+# Re-ejecución automática dentro de la VM si se lanza desde el host
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
-  if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
-    echo "No estoy dentro de la VM. Reejecutando el helper con Vagrant..."
-    cd "$BONUS_ROOT"
-    BONUS_INSIDE_VM=1 vagrant ssh -c 'cd /vagrant && BONUS_INSIDE_VM=1 bash /vagrant/scripts/create-gitlab-project-and-push.sh'
-    exit $?
-  fi
-
-  echo "No encuentro el kubeconfig de la VM. Ejecuta primero 'vagrant up' y luego lanza este script dentro de la VM."
-  exit 1
+    if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
+        cd "$BONUS_ROOT"
+        BONUS_INSIDE_VM=1 vagrant ssh -c \
+            'cd /vagrant && BONUS_INSIDE_VM=1 bash /vagrant/scripts/create-gitlab-project-and-push.sh'
+        exit $?
+    fi
+    echo "No encuentro el kubeconfig. Ejecuta primero 'vagrant up'."
+    exit 1
 fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
 
-GITLAB_URL="http://gitlab.local"
+GITLAB_VM_URL="http://gitlab.localhost"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
-PROJECT_URL=""
-PROJECT_REPO_URL=""
+PROJECT_REPO_URL_PUSH="${GITLAB_VM_URL}/${PROJECT_FULL_PATH}.git"
+GITLAB_PAT_NAME="mlezcano-argo"
 
-log() {
-  echo "[$1] $2"
+log() { echo "[$1] $2"; }
+
+get_toolbox_pod() {
+    kubectl -n gitlab get pods -o name | grep '/gitlab-toolbox' | head -n 1 | cut -d/ -f2
 }
 
 wait_for_gitlab_ui() {
-  log "1/6" "Esperando GitLab disponible en ${GITLAB_URL}..."
-  for _ in $(seq 1 60); do
-    if curl -fsS "${GITLAB_URL}/users/sign_in" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 3
-  done
-
-  echo "GitLab no respondió a tiempo. Revisa que la VM siga levantada y que el namespace gitlab esté Ready."
-  exit 1
-}
-
-wait_for_root_password() {
-  log "2/6" "Esperando la contraseña inicial de root..."
-  for _ in $(seq 1 60); do
-    ROOT_PASSWORD=$(kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
-    if [ -n "$ROOT_PASSWORD" ]; then
-      export ROOT_PASSWORD
-      return 0
-    fi
-    sleep 5
-  done
-
-  echo "No pude leer el secreto gitlab-gitlab-initial-root-password."
-  echo "Espera unos segundos más y vuelve a lanzar el script si GitLab sigue arrancando."
-  exit 1
-}
-
-get_toolbox_pod() {
-  kubectl -n gitlab get pods -o name | grep '/gitlab-toolbox' | head -n 1 | cut -d/ -f2
+    log "1/4" "Esperando GitLab disponible en el clúster..."
+    kubectl -n gitlab wait --for=condition=ready pod \
+        -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
 }
 
 ensure_project() {
-  local toolbox_pod project_output project_web_url project_repo_url ruby_script
-  toolbox_pod=$(get_toolbox_pod)
+    local toolbox_pod project_output project_repo_url
+    toolbox_pod=$(get_toolbox_pod)
+    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab."; exit 1; }
 
-  if [ -z "$toolbox_pod" ]; then
-    echo "No encuentro el pod toolbox de GitLab dentro del clúster."
-    exit 1
-  fi
-
-  log "3/6" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
-  ruby_script=$(cat <<'RUBY'
+    log "2/4" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
+    project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
+        gitlab-rails runner - <<'RUBY' 2>/dev/null || true
 user = User.find_by_username('root')
 project = Project.find_by_full_path('root/mlezcano-gitlab-demo')
 
 if project.nil?
   project = Projects::CreateService.new(user, {
-    name: 'mlezcano-gitlab-demo',
-    path: 'mlezcano-gitlab-demo',
+    name:             'mlezcano-gitlab-demo',
+    path:             'mlezcano-gitlab-demo',
     visibility_level: Gitlab::VisibilityLevel::PRIVATE
   }).execute
 end
 
-abort(project.errors.full_messages.join(', ')) if project.respond_to?(:errors) && project.errors.any?
-puts project.web_url
+abort(project.errors.full_messages.join(', ')) \
+  if project.respond_to?(:errors) && project.errors.any?
 puts project.http_url_to_repo
 RUBY
 )
 
-  project_output=$(kubectl exec -n gitlab -c toolbox "$toolbox_pod" -- gitlab-rails runner "$ruby_script" 2>/dev/null || true)
-  project_web_url=$(printf '%s
-' "$project_output" | sed -n '1p' | tr -d '\r')
-  project_repo_url=$(printf '%s
-' "$project_output" | sed -n '2p' | tr -d '\r')
-
-  if [ -z "$project_repo_url" ] || [ "$project_repo_url" = "nil" ]; then
-    echo "No pude crear ni leer el proyecto '${PROJECT_FULL_PATH}'."
-    echo "Salida de depuración:"
-    echo "$project_output"
-    exit 1
-  fi
-
-  PROJECT_URL="$project_web_url"
-  PROJECT_REPO_URL="$project_repo_url"
-  export PROJECT_URL
-  export PROJECT_REPO_URL
+    project_repo_url=$(printf '%s\n' "$project_output" | tail -n 1 | tr -d '\r')
+    if [ -z "$project_repo_url" ] || [ "$project_repo_url" = "nil" ]; then
+        echo "No pude crear el proyecto '${PROJECT_FULL_PATH}'."
+        echo "Salida: $project_output"
+        exit 1
+    fi
 }
 
-write_repo_files() {
-  TMPDIR=$(mktemp -d)
-  export TMPDIR
-  cd "$TMPDIR"
+create_gitlab_pat() {
+    local toolbox_pod pat_output
+    toolbox_pod=$(get_toolbox_pod)
+    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab."; exit 1; }
 
-  cat > deployment.yaml <<'EOF'
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mlezcano-playground
-  namespace: dev
-  labels:
-    app: playground
-    owner: mlezcano
-    demo: gitlab-local
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: playground
-  template:
-    metadata:
-      labels:
-        app: playground
-        owner: mlezcano
-        demo: gitlab-local
-    spec:
-      containers:
-      - name: mlezcano-playground
-        image: mikelezc/playground:v1
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8888
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mlezcano-playground
-  namespace: dev
-  labels:
-    app: playground
-    owner: mlezcano
-    demo: gitlab-local
-spec:
-  type: NodePort
-  ports:
-  - port: 8888
-    targetPort: 8888
-    nodePort: 30080
-  selector:
-    app: playground
-EOF
+    log "3/4" "Creando Personal Access Token '${GITLAB_PAT_NAME}'..."
+    pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
+        gitlab-rails runner - <<'RUBY' 2>/dev/null || true
+user = User.find_by_username('root')
+user.personal_access_tokens.where(name: 'mlezcano-argo').delete_all
 
-  cat > README.md <<'EOF'
-# Mlezcano GitLab Local Demo
+response = PersonalAccessTokens::CreateService.new(
+  current_user:    user,
+  target_user:     user,
+  organization_id: user.organization_id,
+  params: { name: 'mlezcano-argo', scopes: [:read_repository, :write_repository] }
+).execute
 
-Este repositorio vive en el GitLab local del bonus y es el origen que Argo CD
-usa para desplegar la aplicación de ejemplo.
+abort(response.message) unless response.success?
+puts response.payload[:personal_access_token].token
+RUBY
+)
 
-Contiene:
+    PAT_TOKEN=$(printf '%s\n' "$pat_output" | tail -n 1 | tr -d '\r')
+    if [ -z "$PAT_TOKEN" ]; then
+        echo "No pude crear el token de acceso."
+        echo "Salida: $pat_output"
+        exit 1
+    fi
 
-- `deployment.yaml`: manifiesto de Kubernetes para la demo.
-- `README.md`: nota visible para distinguir esta demo en GitLab.
-
-La imagen usada es `mikelezc/playground:v1` y el branding deja claro que es una
-aplicación cargada desde GitLab local, no el flujo antiguo de `wil42`.
-EOF
+    echo "$PAT_TOKEN" > "$PAT_FILE"
+    chmod 600 "$PAT_FILE"
+    export PAT_TOKEN
 }
 
-push_commit() {
-  git init -q
-  git config user.email "mlezcano@local"
-  git config user.name "mlezcano"
-  git add README.md deployment.yaml
-  git commit -q -m "Initial mlezcano GitLab demo"
-  git branch -M main
+push_to_gitlab() {
+    log "4/4" "Haciendo push del manifiesto a GitLab..."
 
-  echo "Pusheando a ${PROJECT_REPO_URL}..."
-  ESC_PWD=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$ROOT_PASSWORD")
-  AUTH_URL=$(echo "$PROJECT_REPO_URL" | sed "s#http://#http://root:${ESC_PWD}@#")
+    if [ -f "/vagrant/confs/deployment.yaml" ]; then
+        MANIFEST_PATH="/vagrant/confs/deployment.yaml"
+    else
+        MANIFEST_PATH="${BONUS_ROOT}/confs/deployment.yaml"
+    fi
 
-  git remote add origin "$AUTH_URL"
-  if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
-    git fetch -q origin main
-    git merge -q --allow-unrelated-histories -s ours -m "Sync remote main" origin/main
-  fi
+    WORK_DIR=$(mktemp -d)
+    trap 'rm -rf "$WORK_DIR"' EXIT
 
-  git push -u origin main -q
+    cp "$MANIFEST_PATH" "$WORK_DIR/deployment.yaml"
+    cat > "$WORK_DIR/README.md" <<'MD'
+# mlezcano-gitlab-demo
+
+Repositorio local en GitLab. Argo CD sincroniza desde aquí para desplegar
+la aplicación de ejemplo en el namespace `dev`.
+
+Para probar el flujo GitOps, edita `deployment.yaml` y cambia la imagen:
+- `mikelezc/playground:v1`
+- `mikelezc/playground:v2`
+
+Cada commit en la rama `main` dispara una sincronización automática en Argo CD.
+MD
+
+    cd "$WORK_DIR"
+    git init -q
+    git config user.email "mlezcano@local"
+    git config user.name "mlezcano"
+    git add deployment.yaml README.md
+    git commit -q -m "Initial commit: deployment manifest for Argo CD"
+    git branch -M main
+
+    ESC_PAT=$(python3 -c \
+        'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' \
+        "$PAT_TOKEN")
+    AUTH_URL="${PROJECT_REPO_URL_PUSH/http:\/\//http://root:${ESC_PAT}@}"
+    git remote add origin "$AUTH_URL"
+
+    if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+        git fetch -q origin main
+        git merge -q --allow-unrelated-histories -s ours -m "Sync" origin/main
+    fi
+
+    git push -u origin main -q
 }
-
-print_next_steps() {
-  cat <<EOF
-
-=== Siguiente paso para la corrección ===
-1. Si Argo CD ya apunta a este repo local, abre la UI y comprueba Sync/Health.
-2. Si aún no apunta al repo local, actualiza bonus/confs/argocd.yaml con:
-   ${PROJECT_REPO_URL}
-3. En Argo CD, fuerza Refresh o Sync si hace falta.
-4. Valida la app con:
-   curl http://localhost:8888/
-5. Cambia VERSION a v2 en el repo de GitLab y repite el push para mostrar la reconcilación.
-
-URL del proyecto: ${PROJECT_URL}
-Repositorio creado: ${PROJECT_REPO_URL}
-EOF
-}
-
-cleanup() {
-  if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
-    rm -rf "$TMPDIR"
-  fi
-}
-
-trap cleanup EXIT
 
 wait_for_gitlab_ui
-wait_for_root_password
 ensure_project
-log "4/6" "Proyecto listo: ${PROJECT_URL}"
-write_repo_files
-log "5/6" "Creando commit inicial y empujando a main..."
-push_commit
-log "6/6" "Proyecto y commit inicial creados correctamente."
-print_next_steps
+create_gitlab_pat
+push_to_gitlab
+
+echo ""
+echo "============================================================"
+echo "  Repositorio GitLab listo"
+echo "============================================================"
+echo ""
+echo "  URL:      http://localhost:8081/${PROJECT_FULL_PATH}"
+echo "  rama:     main"
+echo "  manifest: deployment.yaml  (imagen: mikelezc/playground:v1)"
+echo ""
+echo "Próximo paso — conectar Argo CD al repositorio:"
+echo "  ./scripts/connect-argocd-to-gitlab.sh"
+echo ""

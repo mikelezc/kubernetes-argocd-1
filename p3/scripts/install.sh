@@ -87,7 +87,7 @@ main() {
 
   ensure_docker_ready
 
-  log "Creando cluster k3d mínimo"
+  log "Creando cluster k3d con nombre $CLUSTER_NAME"
   k3d cluster delete "$CLUSTER_NAME" >/dev/null 2>&1 || true
   k3d cluster create "$CLUSTER_NAME" \
     --servers 1 \
@@ -145,11 +145,18 @@ EOF
   log "Aplicando la Application de Argo CD"
   kubectl apply -f "$REPO_ROOT/confs/argocd.yaml" >/dev/null
 
-  log "Instalación completada"
-  echo "Argo CD: http://localhost:8080"
-  echo "App:     http://localhost:8888"
-  echo "Usuario: admin"
-  echo "Contraseña: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+  echo ""
+  echo "============================================================"
+  echo "=================== Instalación completada ================="
+  echo "============================================================"
+  echo ""
+  echo ""
+  echo "Puedes acceder a Argo CD en: http://localhost:8080"
+  echo "    - usuario: admin"
+  echo "    - contraseña: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+  echo ""
+  echo "Puedes ver la app en: http://localhost:8888"
+  echo ""
 }
 
 main "$@"

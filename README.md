@@ -1,39 +1,65 @@
-# Inception of Things - Proyecto Explicado 🚀
+# Inception of Things (IoT)
 
-Este repositorio contiene la solución completa para el proyecto **Inception of Things (IoT)**, estructurado y documentado para que alguien que no ha tocado estas tecnologías (Vagrant, Kubernetes, K3s, K3d, ArgoCD) lo entienda paso a paso.
+## Qué es este proyecto
 
-## Para usuarios de Mac (Apple Silicon M4 Pro)
-El "Subject" original habla de usar Vagrant y (normalmente implican) VirtualBox. **VirtualBox no funciona en los nuevos Mac con chips M (M1, M2, M3, M4)** de forma nativa/rendimiento decente.
-Para la corrección se exige hacerlo en una máquina virtual Linux, puedes ejecutar una VM (por ejemplo en UTM, Parallels o VMware) con Ubuntu Server, y dentro de esa VM ejecutar todo este proyecto (Vagrant usa QEMU/KVM en Linux sin problemas).
+**Inception of Things** es una introducción práctica a Kubernetes a través de cuatro entornos progresivos.
+Cada parte añade una capa nueva sobre la anterior: primero Vagrant y K3s, luego Ingress, después GitOps con Argo CD, y finalmente GitOps 100% local con GitLab on-premise.
 
-Si vas a ejecutar Vagrant **directamente desde tu Mac (macOS)**, asegúrate de tener instalado un proveedor compatible con ARM64, como `vmware_desktop` o Parallels, y cambiar las `boxes` de Vagrant (`bento/ubuntu-22.04` por `bento/ubuntu-22.04-arm64`). En los scripts lo dejo indicado.
+## Estructura del repositorio
 
----
+| Carpeta | Parte | Tecnologías | Qué hace |
+|---------|-------|-------------|----------|
+| [p1/](p1/) | Parte 1 | Vagrant + K3s | Dos VMs: un nodo servidor K3s y un nodo agente |
+| [p2/](p2/) | Parte 2 | Vagrant + K3s + Ingress | Una VM con tres apps web enrutadas por nombre de host |
+| [p3/](p3/) | Parte 3 | K3d + Argo CD + GitHub | GitOps: Argo CD sincroniza manifests desde GitHub |
+| [bonus/](bonus/) | Bonus | K3d + Argo CD + GitLab | GitOps 100% local: Argo CD sincroniza desde GitLab on-premise |
 
-## Conceptos Previos Rápidos
+Cada carpeta tiene su propio README con los detalles de arranque, verificación y comprobaciones para la corrección.
 
-1. **Vagrant**: Una herramienta para crear y configurar Máquinas Virtuales (VMs) a través de un archivo de texto (`Vagrantfile`). Con un comando (`vagrant up`) levantas las máquinas, instalar programas y configurarlas sin tocar la interfaz gráfica (la UI de VirtualBox/VMware).
+## Nota sobre multi-arquitectura (ARM vs AMD64)
 
-2. **Kubernetes (K8s)**: Es un sistema para manejar "contenedores" (piensa en Docker). Escala tus apps, las reinicia si fallan y las actualiza. Es súper completo pero *pesado*.
+Este proyecto se desarrolló mitad en Mac con Apple Silicon (ARM64) y la otra mitad en una máquina con Linux y arquitectura AMD64 (x86_64). Todos los módulos están preparados para funcionar en ambas arquitecturas:
 
-3. **K3s**: Es Kubernetes pero en versión "Light", súper ligero, ideal para entornos con pocos recursos, quita funciones engorrosas y deja lo esencial en un solo archivo binario.
+- **p1 / p2**: el Vagrantfile detecta la arquitectura y elige el proveedor correcto
+  (VMware Desktop en ARM, VirtualBox en AMD64). La box usada (`bento/ubuntu-22.04`) tiene imagen
+  para ambas arquitecturas.
+- **p3**: `scripts/install.sh` detecta `uname -m` y descarga el binario correcto de kubectl.
+  K3d y Docker son compatibles con ambas arquitecturas de forma nativa.
+- **bonus**: mismo comportamiento que p3. El Vagrantfile del bonus también detecta la arquitectura.
+- **Docker Hub**: la imagen de docker usada en el proyecto `mikelezc/playground` se fué desarrollada y se publicó como manifiesto multi-arquitectura
+  con soporte para `linux/amd64` y `linux/arm64`. En el subject proyecto se hablaba de la posibilidad de usar una que nos daban ya hecha, pero había incompatibilidades con ARM y se optó por desarrollarla de esta manera finalmente.
 
-4. **K3d**: Es K3s pero que se ejecuta ¡dentro de Docker! En vez de levantar máquinas virtuales, usas contenedores de Docker para simular nodos de Kubernetes. Más rápido.
+En una máquina AMD64 con Linux, VirtualBox es el proveedor estándar de Vagrant y funciona sin
+cambios adicionales.
 
-5. **Argo CD / GitOps**: Es una herramienta que vigila un repositorio tuyo de GitHub, y si cambias algo allí (por ejemplo la versión de tu app de v1 a v2), Argo CD lo detecta y lo actualiza automáticamente en Kubernetes.
+## Recursos externos del proyecto
 
----
+| Recurso | URL |
+|---------|-----|
+| Repositorio GitHub (p3) | `https://github.com/mikelezc/mlezcano-iot-argocd` |
+| Imagen Docker Hub | `https://hub.docker.com/r/mikelezc/playground` |
 
-## Organización del repo
+## Conceptos clave por parte
 
-Se han separado las 3 partes obligatorias tal y como exige el Subject:
+**K3s** (p1, p2): Kubernetes ligero. Ideal para VMs con
+pocos recursos y para aprender sin la sobrecarga de un cluster Kubernetes completo.
 
-- **p1/**: Contiene la Parte 1. Configuración de 2 VMs usando Vagrant. Una actuará de servidor K3s y otra de trabajador (Agent).
+**Vagrant** (p1, p2, bonus): define y levanta VMs reproducibles desde un `Vagrantfile`. Con un solo comando
+(`vagrant up`) se puede crear, configurar e instalar todo lo necesario dentro de la VM.
 
-- **p2/**: Contiene la Parte 2. Configuración de 1 VM servidor K3s. Se despliegan 3 aplicaciones web de ejemplo manejadas por un **Ingress** (un balanceador de carga).
+**Traefik** (p1, p2): proxy inverso y balanceador de carga moderno que enruta automáticamente el tráfico entre servicios y aplicaciones, en entornos Docker, Kubernetes y microservicios.
 
-- **p3/**: Contiene la Parte 3. Usa K3d (K3s en Docker) en lugar de Vagrant, para desplegar ArgoCD y crear un flujo de integración continua (CI/CD) conectado a GitHub.
+**Ingress** (p2): objeto de Kubernetes que enruta el tráfico HTTP entrante hacia diferentes servicios
+según el `Host` header o la ruta de la URL. En K3s viene integrado con Traefik.
 
-- **bonus/**: Contiene la parte bonus. Usa K3d y **Helm** para desplegar **GitLab On-Premise** junto a ArgoCD, creando un ecosistema GitOps 100% local e independiente, sin depender de servidores en la nube. 
+**K3d** (p3, bonus): ejecuta K3s dentro de contenedores Docker. Permite tener un cluster de Kubernetes
+completo en la máquina local sin VMs, arrancando en segundos.
 
-***Nota:*** Echa un vistazo a los README de cada carpeta para continuar.
+**Argo CD** (p3, bonus): controlador GitOps. Observa un repositorio Git y reconcilia continuamente
+el estado del cluster con lo que describen los manifiestos en el repo. Si hay diferencias, las actualiza.
+
+**GitOps** (p3, bonus): paradigma donde el repositorio Git es la única fuente de verdad del estado
+de la infraestructura. Ningún cambio se aplica manualmente: todo pasa por un commit.
+
+**Helm** (bonus): gestor de paquetes para Kubernetes. Permite instalar aplicaciones complejas
+(como GitLab, con decenas de componentes) con un solo comando y un fichero de valores.

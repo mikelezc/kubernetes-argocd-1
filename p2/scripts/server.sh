@@ -7,7 +7,7 @@ echo "========================================================="
 echo " Instalando K3S en modo SERVER..."
 echo "========================================================="
 
-# Instalamos k3s. En K3s viene instalado "Traefik" por defecto, que es genial para hacer el Ingress.
+# Instalamos k3s. En K3s viene instalado "Traefik" por defecto para hacer el Ingress.
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --write-kubeconfig-mode 644 \
   --node-ip $SERVER_IP \

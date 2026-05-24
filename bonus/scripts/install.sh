@@ -1,114 +1,239 @@
 #!/bin/bash
-# scripts/install.sh (Bonus)
+# Este script instala herramientas, crear cluster k3d iot-bonus,
+# desplegará GitLab (namespace gitlab) y Argo CD (namespace argocd).
 
 set -e
 
-progress_step() {
+log_section() {
     echo ""
-    echo "[$1] $2"
+    echo "========================================================="
+    echo " $1"
+    echo "========================================================="
 }
 
-echo "========================================================="
-echo " Preparando la VM e Instalando utilidades base..."
-echo "========================================================="
+log_ok()   { echo "[OK]   $1"; }
+log_warn() { echo "[WARN] $1"; }
 
-progress_step "1/6" "Instalando Docker, kubectl y k3d"
+wait_for_minio_endpoint() {
+    for _ in 1 2 3 4 5 6; do
+        if kubectl -n gitlab get endpoints gitlab-minio-svc \
+            -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
 
-# Instalamos Docker si no está
-if ! command -v docker &> /dev/null; then
+# -------------------------------------------------------
+log_section "1/5 — Herramientas base (Docker, kubectl, k3d, Helm)"
+# -------------------------------------------------------
+
+if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
-    newgrp docker
+    sudo usermod -aG docker vagrant
 fi
 
-# Instalamos kubectl cross-platform
-if ! command -v kubectl &> /dev/null; then
+if ! command -v kubectl &>/dev/null; then
     ARCH=$(dpkg --print-architecture)
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
     sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 fi
 
-# Instalamos K3d
-if ! command -v k3d &> /dev/null; then
+if ! command -v k3d &>/dev/null; then
     curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 fi
 
-echo "========================================================="
-echo " Instalando Helm, GitLab y Argo CD..."
-echo "========================================================="
-
-progress_step "2/6" "Instalando Helm"
-
-# Instalamos helm si no lo tienes
-if ! command -v helm &> /dev/null; then
+if ! command -v helm &>/dev/null; then
     curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | sudo bash
 fi
 
-progress_step "3/6" "Creando el cluster k3d iot-bonus"
+# -------------------------------------------------------
+log_section "2/5 — Cluster k3d iot-bonus"
+# -------------------------------------------------------
 
-# Creamos el cluster k3d
-k3d cluster delete iot-bonus || true
-# Importante: añadimos puertos extras para gitlab (80, 443, 22)
-k3d cluster create iot-bonus --api-port 6550 -p "80:80@loadbalancer" -p "443:443@loadbalancer" -p "8080:8080@loadbalancer" -p "8888:8888@loadbalancer"
+k3d cluster delete iot-bonus 2>/dev/null || true
+k3d cluster create iot-bonus \
+    --api-port 6550 \
+    -p "80:80@loadbalancer" \
+    -p "443:443@loadbalancer" \
+    -p "8080:8080@loadbalancer" \
+    -p "8888:30080@server:0"
 
-# Dejamos el kubeconfig disponible para futuras sesiones de vagrant ssh
 mkdir -p /home/vagrant/.kube
 k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
+export KUBECONFIG=/home/vagrant/.kube/config
 
-progress_step "4/6" "Añadiendo el repo de GitLab y namespaces"
+kubectl create namespace gitlab --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace dev    --dry-run=client -o yaml | kubectl apply -f -
 
-# Añadir repositorio de GitLab
-helm repo add gitlab https://charts.gitlab.io/
-helm repo update
+# -------------------------------------------------------
+log_section "3/5 — GitLab (Helm chart 9.9.0)"
+# -------------------------------------------------------
 
-# Crear namespace
-kubectl create namespace gitlab 2>/dev/null || true
-kubectl create namespace argocd 2>/dev/null || true
-kubectl create namespace dev 2>/dev/null || true
+helm repo add gitlab https://charts.gitlab.io/ && helm repo update
 
-echo "Instalando GitLab via Helm. Esto tomará MUCHO TIEMPO..."
-progress_step "5/6" "Desplegando GitLab con Helm"
-# Usamos un despliegue minimalista pensado para evitar que los ordenadores exploten
-# Soporte dual: Vagrant (/vagrant) o Linux Manual (..)
 if [ -f "/vagrant/confs/gitlab-values.yaml" ]; then
     VALUES_PATH="/vagrant/confs/gitlab-values.yaml"
 else
     VALUES_PATH="../confs/gitlab-values.yaml"
 fi
 
-# El chart 10.x endurece la configuración y exige Redis/PostgreSQL/Object Storage externos.
-# Para este laboratorio fijamos una versión anterior compatible con el values minimalista.
-GITLAB_CHART_VERSION="9.9.0"
-
 if ! helm upgrade --install gitlab gitlab/gitlab \
-    --version "$GITLAB_CHART_VERSION" \
+    --version 9.9.0 \
     --timeout 600s \
     --namespace gitlab \
     -f "$VALUES_PATH"; then
-    echo "Error: GitLab no se pudo instalar con Helm. Revisa el mensaje anterior y el values.yaml."
+    echo "Error: GitLab no se pudo instalar con Helm."
     exit 1
 fi
 
-progress_step "6/6" "Desplegando Argo CD"
+echo "Parcheando Ingress de GitLab a clase traefik..."
+for INGRESS in gitlab-webservice-default gitlab-kas gitlab-minio; do
+    if kubectl -n gitlab patch ingress "$INGRESS" \
+        --type=merge -p '{"spec":{"ingressClassName":"traefik"}}' 2>/dev/null; then
+        log_ok "$INGRESS parcheado"
+    else
+        log_ok "$INGRESS ya estaba parcheado"
+    fi
+done
 
-echo "Instalando Argo CD..."
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
+echo "Esperando pod MinIO..."
+kubectl -n gitlab wait --for=condition=ready pod \
+    -l app=minio,release=gitlab --timeout=300s 2>/dev/null \
+    || log_warn "MinIO tarda más de lo normal"
 
-echo "¡Instalación base completada!"
+if wait_for_minio_endpoint; then
+    log_ok "MinIO responde en su endpoint"
+else
+    log_warn "MinIO aún no expone el endpoint — se probará igualmente"
+fi
+
+echo "Inicializando buckets MinIO..."
+ACCESS_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
+    -o jsonpath="{.data.accesskey}" | base64 -d 2>/dev/null || echo "minioadmin")
+SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
+    -o jsonpath="{.data.secretkey}" | base64 -d 2>/dev/null || echo "minioadmin")
+
+for attempt in 1 2 3; do
+    if kubectl -n gitlab run mc-init --rm -i --restart=Never \
+        --image=minio/mc:latest \
+        --command -- /bin/sh -c "
+            mc alias set myminio http://gitlab-minio-svc.gitlab.svc:9000 \
+                '$ACCESS_KEY' '$SECRET_KEY' >/dev/null 2>&1
+            for b in registry git-lfs runner-cache gitlab-uploads gitlab-artifacts \
+                      gitlab-backups gitlab-packages tmp gitlab-mr-diffs \
+                      gitlab-terraform-state gitlab-ci-secure-files \
+                      gitlab-dependency-proxy gitlab-pages; do
+                mc mb myminio/\$b >/dev/null 2>&1 || true
+                mc policy none myminio/\$b >/dev/null 2>&1 || true
+            done
+        " >/dev/null 2>&1; then
+        break
+    fi
+    [ "$attempt" -lt 3 ] && { log_warn "MinIO aún arrancando, reintentando..."; sleep 3; continue; }
+    log_warn "No se pudo inicializar MinIO tras varios intentos"
+done
+
+# -------------------------------------------------------
+log_section "4/5 — Argo CD (modo HTTP, sin Application)"
+# -------------------------------------------------------
+
+kubectl apply -n argocd \
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
+
+echo "Esperando Argo CD server..."
+kubectl -n argocd wait --for=condition=ready pod \
+    -l app.kubernetes.io/name=argocd-server --timeout=300s >/dev/null
+
+echo "Ajustando reconciliación a 5s..."
+kubectl -n argocd patch configmap argocd-cm \
+    --type merge -p '{"data":{"timeout.reconciliation":"5s","timeout.reconciliation.jitter":"0s"}}' >/dev/null
+kubectl -n argocd rollout restart statefulset/argocd-application-controller >/dev/null
+kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=180s >/dev/null
+
+echo "Habilitando modo HTTP (insecure)..."
+kubectl -n argocd patch configmap argocd-cmd-params-cm \
+    --type merge -p '{"data":{"server.insecure":"true"}}' >/dev/null
+kubectl -n argocd rollout restart deployment argocd-server >/dev/null
+kubectl -n argocd rollout status deployment argocd-server --timeout=180s >/dev/null
+
+echo "Creando Ingress para Argo CD..."
+kubectl -n argocd apply -f - >/dev/null <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+EOF
+
+# -------------------------------------------------------
+log_section "5/5 — Contraseña inicial de GitLab"
+# -------------------------------------------------------
+
+ROOT_SECRET="gitlab-gitlab-initial-root-password"
+echo "Esperando secret con contraseña root de GitLab..."
+for i in $(seq 1 24); do
+    kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1 && break
+    sleep 5
+done
+
+DECODED=""
+if kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1; then
+    ENCODED=$(kubectl -n gitlab get secret "$ROOT_SECRET" \
+        -o jsonpath='{.data.password}' 2>/dev/null || true)
+    DECODED=$(echo "$ENCODED" | base64 -d 2>/dev/null || true)
+fi
+
 echo ""
-echo "========================================================="
-echo " GUIA RAPIDA DE USO"
-echo "========================================================="
-echo "1) Asegura este mapeo en tu Mac: 192.168.56.110 gitlab.local"
-echo "2) Abre GitLab en: http://gitlab.local"
-echo "3) Comprueba el estado de los pods con: kubectl get pods -n gitlab -w"
-echo "4) Comprueba Argo CD con: kubectl get pods -n argocd -w"
-echo "5) Si la UI no responde aun, espera a que GitLab pase a Ready; tarda bastante"
-echo "6) La app de ejemplo queda expuesta en: http://localhost:8888"
+echo "============================================================"
+echo "=================== Instalación completada ================="
+echo "============================================================"
 echo ""
-echo "Comandos utiles dentro de la VM:"
-echo "- kubectl get pods -A"
-echo "- kubectl get svc -n gitlab"
-echo "- kubectl logs -n gitlab -l app=webservice --tail=50"
+echo "GitLab:    http://gitlab.localhost:8081"
+echo ""
+echo "  usuario:    root"
+if [ -n "$DECODED" ]; then
+    echo "  contraseña: $DECODED"
+else
+    echo "  contraseña: kubectl -n gitlab get secret gitlab-gitlab-initial-root-password \\"
+    echo "               -o jsonpath='{.data.password}' | base64 -d"
+fi
+echo ""
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
+    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
+
+echo "Argo CD:   http://localhost:8081  (sin Application aún)"
+echo ""
+echo "  usuario:    admin"
+if [ -n "$ARGOCD_PASSWORD" ]; then
+    echo "  contraseña: $ARGOCD_PASSWORD"
+else
+    echo "  contraseña: kubectl -n argocd get secret argocd-initial-admin-secret \\"
+    echo "               -o jsonpath='{.data.password}' | base64 -d"
+fi
+echo ""
+echo "Próximos pasos:"
+echo ""
+echo "  1. Crear repositorio en GitLab y hacer push del manifiesto:"
+echo "       ./scripts/create-gitlab-project-and-push.sh"
+echo ""
+echo "  2. Conectar Argo CD al repositorio GitLab:"
+echo "       ./scripts/connect-argocd-to-gitlab.sh"
+echo ""
