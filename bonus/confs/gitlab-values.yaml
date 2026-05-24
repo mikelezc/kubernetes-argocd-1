@@ -1,13 +1,14 @@
 # gitlab-values.yaml
-# Una configuración "ultraligera" de GitLab en Kubernetes.
+# Configuración "mega-light" de GitLab en Kubernetes.
+# Esta configuración es la que será utilizada por Helm para desplegar GitLab en el cluster de Kubernetes.
 global:
-  edition: ce
+  edition: ce               # Community Edition
   hosts:
     domain: localhost
     https: false
 installCertmanager: false
 certmanager-issuer:
-  email: admin@gitlab.local
+  email: admin@gitlab.local 
 nginx-ingress:
   enabled: false
 prometheus:
