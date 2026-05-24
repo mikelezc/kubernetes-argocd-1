@@ -74,6 +74,10 @@ patch_coredns() {
 }
 
 wait_for_argocd() {
+  echo "Esperando que se creen los pods de ArgoCD..."
+  while ! kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server 2>/dev/null | grep -q argocd-server; do
+    sleep 2
+  done
   kubectl wait --for=condition=Ready pods --all -n argocd --timeout=300s >/dev/null
 }
 
