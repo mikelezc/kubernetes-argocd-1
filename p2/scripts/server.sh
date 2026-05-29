@@ -1,7 +1,11 @@
 #!/bin/bash
 # scripts/server.sh (Parte 2)
 
+set -euo pipefail
+
 SERVER_IP=$1
+IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
+
 
 echo "========================================================="
 echo " Instalando K3S en modo SERVER..."
@@ -12,7 +16,7 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --write-kubeconfig-mode 644 \
   --node-ip $SERVER_IP \
   --bind-address $SERVER_IP \
-  --flannel-iface eth1" sh -
+  --flannel-iface $IFACE" sh -
 
 echo "========================================================="
 echo " Esperando a que el clúster inicie correctamente..."

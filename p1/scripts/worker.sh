@@ -1,12 +1,22 @@
 #!/bin/bash
 # scripts/worker.sh
 
+set -euo pipefail
+
 SERVER_IP=$1
 WORKER_IP=$2
+IFACE=$(ip -4 addr show | grep $WORKER_IP | awk '{print $NF}')
+
 
 echo "========================================================="
 echo " Instalando K3S en modo AGENT en mlezcanoSW..."
 echo "========================================================="
+
+# Esperamos a que el servidor haya guardado el token
+echo "Esperando por el node-token de K3s Server..."
+while [ ! -f /vagrant/node-token ]; do
+  sleep 2
+done
 
 # Recuperamos el TOKEN secreto que el servidor guardó en la carpeta compartida:
 TOKEN=$(cat /vagrant/node-token)
@@ -22,6 +32,6 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent \
   --server https://$SERVER_IP:6443 \
   --token ${TOKEN} \
   --node-ip $WORKER_IP \
-  --flannel-iface eth1" sh -
+  --flannel-iface $IFACE" sh -
 
 echo "Instalación del Worker Completada! SRevisa el server para ver este nuevo nodo."

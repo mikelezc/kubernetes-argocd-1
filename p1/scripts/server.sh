@@ -1,7 +1,12 @@
 #!/bin/bash
 # scripts/server.sh
 # K3s recomienda tener un comportamiento predecible del nodo usando las IPs de arriba
+
+set -euo pipefail
+
 SERVER_IP=$1
+IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
+
 
 echo "========================================================="
 echo " Instalando K3S en modo SERVER en mlezcanoS..."
@@ -20,7 +25,7 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --tls-san $SERVER_IP \
   --node-ip $SERVER_IP \
   --bind-address $SERVER_IP \
-  --flannel-iface eth1" sh -
+  --flannel-iface $IFACE" sh -
 
 # El servidor de k3s crea un TOKEN secreto (como contraseña) que 
 # usarán los workers para poder unirse a él.
