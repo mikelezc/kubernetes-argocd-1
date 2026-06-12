@@ -1,8 +1,6 @@
-# Inception of Things (IoT)
-
 ## Qué es este proyecto
 
-**Inception of Things** es una introducción práctica a Kubernetes a través de cuatro entornos progresivos.
+Es una introducción práctica a Kubernetes a través de cuatro entornos progresivos.
 Cada parte añade una capa nueva sobre la anterior: primero Vagrant y K3s, luego Ingress, después GitOps con Argo CD, y finalmente GitOps 100% local con GitLab on-premise.
 
 ## Estructura del repositorio
