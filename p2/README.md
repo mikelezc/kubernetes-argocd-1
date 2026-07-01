@@ -22,45 +22,44 @@ En la parte 1 levantamos la infraestructura básica (Nodos). En esta parte 2 dam
 
 ## Checklist de verificación del Subject
 
-1. **Confirmar que el `Vagrantfile` está presente y solo define 1 VM**
-   - Comprueba que el fichero `p2/Vagrantfile` existe.
-   - Abre su contenido y verifica que solo hay `config.vm.define` para una máquina (ej. `mlezcanoS`).
+1. **Confirmamos que el `Vagrantfile` está presente y solo define 1 VM**
+   - Comprobamos que el fichero `p2/Vagrantfile` existe.
+   - Abrimos su contenido y verificamos que solo hay `config.vm.define` para una máquina (ej. `mlezcanoS`).
 
-2. **Comprobar la distribución usada**
-   - El enunciado permite usar la versión estable más reciente de la distro de tu elección. Asegúrate de que el `Vagrantfile` usa una `box` razonable (por ejemplo `bento/ubuntu-22.04` o `debian/...`).
+2. **Comprobamos la distribución usada**
+   - El enunciado permite usar la versión estable más reciente de la distro de tu elección. Podemos comprobar de que el `Vagrantfile` usa una `box` razonable (por ejemplo `bento/ubuntu-22.04`).
 
-3. **Verificar la interfaz de red `eth1` y su IP**
-   - Entra en la VM: `vagrant ssh mlezcanoS`.
-   - Ejecuta `ip addr show eth1` y comprueba que la IP es `192.168.56.110`.
+3. **Verificamos la interfaz de red `eth1` y su IP**
+   - Entramos en la VM: `vagrant ssh mlezcanoS`.
+   - Ejecutamos `ip addr show eth1` y comprobamos que la IP es `192.168.56.110`.
 
-4. **Verificar el hostname**
-   - Dentro de la VM ejecuta `hostname` y comprueba que devuelve `mlezcanoS`.
+4. **Verificamos el hostname**
+   - Dentro de la VM ejecutamos `hostname` y comprobamos que devuelve `mlezcanoS`.
 
 5. **Comprobar K3s y `kubectl`**
-   - Desde la VM ejecuta `kubectl cluster-info`.
-   - Desde la VM ejecuta `kubectl get nodes -o wide` y verifica que aparece `mlezcanoS` (controller) con estado `Ready`.
+   - Desde la VM ejecutamos `kubectl cluster-info`.
+   - Desde la VM ejecutamos `kubectl get nodes -o wide`, podemos verificar que aparece `mlezcanoS` (controller) con estado `Ready`.
 
-6. **Verificar Deployments, réplicas y pods**
-   - Ejecuta `kubectl get deploy` y comprueba que `app1` y `app3` tienen `1/1` y que `app2` tiene `3/3` en la columna `READY`.
-   - Ejecuta `kubectl get pods` y cuenta: 1 pod de `app1`, 3 pods de `app2` y 1 pod de `app3`.
+6. **Verificamos Deployments, réplicas y pods**
+   - Ejecutamos `kubectl get deploy` y comprobamos que `app1` y `app3` tienen `1/1` y que `app2` tiene `3/3` en la columna `READY`.
+   - Ejecutamos `kubectl get pods` y cuenta: 1 pod de `app1`, 3 pods de `app2` y 1 pod de `app3`.
    - Si `app2` no tubiera 3 réplicas, mostraríamos los `events` y el `describe` del deployment para diagnosticar que ocurre (`kubectl describe deploy app2`).
 
-7. **Verificar el Ingress y el comportamiento por Host header**
-   - Ejecuta `kubectl get ingress` y comprueba que el Ingress está presente y apunta a `192.168.56.110`.
-   - Desde tu host (no dentro de la VM) añade en `/etc/hosts` las entradas para `app1.com`, `app2.com`, `app3.com` apuntando a `192.168.56.110`.
+7. **Verificamos el Ingress y el comportamiento por Host header**
+   - Ejecutamos `kubectl get ingress` y comprobamos que el Ingress está presente y apunta a `192.168.56.110`.
+   - Desde nuestro host (no dentro de la VM) añadimos en `/etc/hosts` las entradas para `app1.com`, `app2.com`, `app3.com` apuntando a `192.168.56.110`.
 
    ```
    192.168.56.110  app1.com app2.com app3.com
    ```
 
-   - Prueba con `curl -H "Host: app1.com" http://192.168.56.110` y `curl -H "Host: app2.com" http://192.168.56.110`.
+   - Probaremos con `curl -H "Host: app1.com" http://192.168.56.110` y `curl -H "Host: app2.com" http://192.168.56.110`.
 
-   - Debes recibir las respuestas correspondientes a App1, App2 (y ver variación entre réplicas en App2) y App3 para hosts no coincidentes.
+   - Debemos recibir las respuestas correspondientes a App1, App2 (y ver variación entre réplicas en App2) y App3 para hosts no coincidentes.
 
-8. **Verificar que no hay ficheros extra inesperados**
+8. **Verificamos que no hay ficheros extra inesperados**
    - Lista el contenido de `p2/` y explica cualquier fichero adicional presente (por ejemplo `confs/`, `scripts/`).
 
-Si alguna de estas comprobaciones falla, documenta la salida y corrígela antes de la evaluación.
 
 ## Comandos de uso
 
@@ -146,7 +145,7 @@ Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh mlezcano
    ```bash
    kubectl get pods
    ```
-   **Lo que verás**: Una lista con los nombres físicos reales (largos e irrepetibles como `app2-59787df8c8-hjjdm`) de tus pequeños mini-servidores. Verás que hay exactamente 1 de app1, 3 de app2 y 1 de app3 funcionando en aislamiento absoluto.
+   **Lo que vemos**: Una lista con los nombres físicos reales (largos e irrepetibles como `app2-59787df8c8-hjjdm`) de tus pequeños mini-servidores. Verás que hay exactamente 1 de app1, 3 de app2 y 1 de app3 funcionando en aislamiento absoluto.
 
 ## Limpieza y Destrucción
 Al igual que en p1, es importante apagar las máquinas para no consumir RAM en tu sistema al finalizar la práctica.
