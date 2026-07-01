@@ -21,6 +21,9 @@ delete_k3d_cluster() {
   if command -v k3d >/dev/null 2>&1; then
     log "Eliminando clúster k3d $cluster_name"
     k3d cluster delete "$cluster_name" >/dev/null 2>&1 || true
+  elif [ -x "$ROOT_DIR/p3/toolbox/run.sh" ]; then
+    log "k3d no está en el host, usando el toolbox de p3 para eliminar $cluster_name"
+    "$ROOT_DIR/p3/toolbox/run.sh" k3d cluster delete "$cluster_name" >/dev/null 2>&1 || true
   fi
 }
 

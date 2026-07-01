@@ -1,6 +1,7 @@
 ## Sobre este proyecto
 
 Esta una introducción práctica a Kubernetes a través de cuatro entornos que van incrementando su complejidad progresivamente.
+
 Cada parte añade una capa nueva sobre la anterior: primero Vagrant y K3s, luego Ingress, después GitOps con Argo CD, y finalmente GitOps 100% local con GitLab on-premise.
 
 ## Estructura del repositorio

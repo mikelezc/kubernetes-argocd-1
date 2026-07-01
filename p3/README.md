@@ -27,6 +27,7 @@ La idea es demostrar despliegue automatizado con trazabilidad: GitHub (estado de
 3. [repo-github/deployment.yaml](repo-github/deployment.yaml): manifiesto que se sube al repo publico monitorizado por Argo CD.
 4. [repo-github/app.py](repo-github/app.py): aplicacion web simple con version `v1`/`v2`.
 5. [repo-github/Dockerfile](repo-github/Dockerfile): imagen de la app.
+6. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` para máquinas sin privilegios de host para instalarlos (ver más abajo).
 
 
 ## Requisitos previos
@@ -57,6 +58,34 @@ Desde `p3/`:
 
 ```bash
 ./scripts/install.sh
+```
+
+### Alternativa sin privilegios de host (cluster de 42)
+
+`scripts/install.sh` instala `kubectl` y `k3d` directamente en el host, lo que
+requiere `sudo`. En máquinas donde `docker` funciona sin sudo pero no hay
+privilegios para instalar paquetes de sistema (como en el cluster de 42), se
+puede usar el toolbox en `toolbox/`: una imagen Docker con `kubectl` y `k3d`
+ya instalados, que se ejecuta montando el socket de Docker del host
+(`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. Así,
+el clúster k3d se crea igualmente como contenedores del Docker del host (no
+anidados), y los puertos publicados (8080, 8888) quedan accesibles en el
+`localhost` real de la máquina, exactamente igual que con la instalación
+directa.
+
+`scripts/install.sh` no cambia: sus comprobaciones `command -v kubectl/k3d`
+encuentran los binarios ya presentes en la imagen del toolbox y omiten la
+instalación.
+
+```bash
+./toolbox/run.sh ./scripts/install.sh
+```
+
+También sirve para lanzar comandos sueltos con las herramientas ya listas:
+
+```bash
+./toolbox/run.sh kubectl get pods -n dev
+./toolbox/run.sh   # shell interactiva con kubectl/k3d/docker(cliente)/git/jq
 ```
 
 Al terminar el script veremos lo siguiente:
