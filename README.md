@@ -1,6 +1,6 @@
 ## Sobre este proyecto
 
-Es una introducción práctica a Kubernetes a través de cuatro entornos progresivos.
+Esta una introducción práctica a Kubernetes a través de cuatro entornos que van incrementando su complejidad progresivamente.
 Cada parte añade una capa nueva sobre la anterior: primero Vagrant y K3s, luego Ingress, después GitOps con Argo CD, y finalmente GitOps 100% local con GitLab on-premise.
 
 ## Estructura del repositorio
@@ -24,7 +24,7 @@ Este proyecto se desarrolló mitad en Mac con Apple Silicon (ARM64) y la otra mi
 - **p3**: `scripts/install.sh` detecta `uname -m` y descarga el binario correcto de kubectl.
   K3d y Docker son compatibles con ambas arquitecturas de forma nativa.
 - **bonus**: mismo comportamiento que p3. El Vagrantfile del bonus también detecta la arquitectura.
-- **Docker Hub**: la imagen de docker usada en el proyecto `mikelezc/playground` se fué desarrollada y se publicó como manifiesto multi-arquitectura
+- **Docker Hub**: la imagen de docker usada en el proyecto `mikelezc/playground` fué desarrollada y se publicó como manifiesto multi-arquitectura
   con soporte para `linux/amd64` y `linux/arm64`. En el subject proyecto se hablaba de la posibilidad de usar una que nos daban ya hecha, pero había incompatibilidades con ARM y se optó por desarrollarla de esta manera finalmente.
 
 En una máquina AMD64 con Linux, VirtualBox es el proveedor estándar de Vagrant y funciona sin
