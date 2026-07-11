@@ -1,9 +1,8 @@
 # Parte 1: K3s y Vagrant
 
-## ¿Qué es esto y por qué lo usamos?
 El objetivo de este proyecto es tener nuestro primer contacto real con **Kubernetes (K8s)**, el sistema estándar en la industria para orquestar contenedores. Dado que Kubernetes estándar consume muchísimos recursos para ser montado de cero de forma local, utilizamos **K3s**.
 
-**K3s** es una distribución certificada de Kubernetes creada por *Rancher* diseñada para ser extremadamente ligera (ocupa menos de 100MB). Es ideal para despliegues IoT (Internet of Things), Edge computing y formación/laboratorios como en nuestro caso.
+**K3s** es una distribución certificada de Kubernetes creada por *Rancher* diseñada para ser extremadamente ligera (ocupa menos de 100MB). Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje como en nuestro caso.
 
 Arquitectura de nuestro clúster:
 - **Server (Controller / Control-Plane)**: Es el nodo "master" del clúster. Expone una API para que nos comuniquemos con él y mantiene el estado general (usando SQLite en el caso de K3s en vez de etcd).
@@ -18,36 +17,35 @@ Arquitectura de nuestro clúster:
 ## Checklist de verificación del cluster
 
 
-1. **Confirmar que existen las dos máquinas**
-  - En `p1/` ejecuta `vagrant up`.
-  - Luego comprueba que Vagrant ha levantado `mlezcanoS` y `mlezcanoSW`.
-  - ***Nota*** Puedes ver esto en `p1/Vagrantfile` también.
+1. **Confirmamos que existen las dos máquinas**
+  - En `p1/` ejecutamos `vagrant up`.
+  - Luego comprobaremos que Vagrant ha levantado `mlezcanoS` y `mlezcanoSW`.
+  - ***Nota*** Podemos comprobarlo en el `p1/Vagrantfile` también.
 
-2. **Verificar que el Server y el Worker tienen los nombres correctos**
-  - Entra al Server con `vagrant ssh mlezcanoS`.
-  - Ejecuta `hostname` o `hostnamectl`.
+2. **Verificamos que el Server y el Worker tienen los nombres correctos**
+  - Entramos al Server con `vagrant ssh mlezcanoS`.
+  - Ejecutamos `hostname` o `hostnamectl`.
   - Debe responder `mlezcanoS`.
-  - Si entras al Worker con `vagrant ssh mlezcanoSW`, debe responder `mlezcanoSW`.
+  - Si entramos al Worker con `vagrant ssh mlezcanoSW`, debe responder `mlezcanoSW`.
 
-3. **Verificar la interfaz de red `eth1` y sus IPs**
-  - En cada máquina ejecuta `ip addr show eth1`.
+3. **Verificamos la interfaz de red `eth1` y sus IPs**
+  - En cada máquina ejecutamos `ip addr show eth1`.
   - En el Server debe aparecer `192.168.56.110`.
   - En el Worker debe aparecer `192.168.56.111`.
-  - Esta es la comprobación más importante de red para el evaluador.
 
-4. **Verificar que K3s está instalado y funcionando**
-  - Entra en el Server, porque ahí vive el control-plane. `vagrant ssh mlezcanoS`
-  - Ejecuta `kubectl cluster-info`.
-  - Debes ver que el control plane, CoreDNS y metrics-server están accesibles desde la API de K3s.
+4. **Verificamos que K3s está instalado y esta funcionando**
+  - Entramos en el Server, porque ahí vive el control-plane. `vagrant ssh mlezcanoS`
+  - Ejecutamos `kubectl cluster-info`.
+  - Podemos ver que el control plane, CoreDNS y metrics-server están accesibles desde la API de K3s.
 
-5. **Verificar que ambos nodos están en el mismo clúster**
-  - Desde el Server ejecuta `kubectl get nodes -o wide`.
+5. **Verificamos que ambos nodos están en el mismo clúster**
+  - Desde el Server ejecutamos `kubectl get nodes -o wide`.
   - Deben aparecer `mlezcanoS` y `mlezcanoSW`.
   - Ambos deben estar en estado `Ready`.
 
-6. **Verificar que los pods del sistema están arriba**
+6. **Verificamos que los pods del sistema están arriba**
   - Ejecuta `kubectl get pods -n kube-system`.
-  - Debes ver pods como CoreDNS, metrics-server, flannel o los componentes que use tu instalación de K3s.
+  - Podremos ver pods como CoreDNS, metrics-server, flannel o los componentes que use tu instalación de K3s.
 
 **Explicación de los diferentes PODS del cluster:**
 
@@ -58,8 +56,8 @@ Arquitectura de nuestro clúster:
     - `svclb-traefik-...`: balanceadores de servicio creados por K3s para exponer Traefik hacia fuera.
     - `traefik-...`: el ingress controller por defecto de K3s, encargado de enrutar tráfico HTTP/HTTPS hacia los servicios correctos.
 
-7. **Entender el 401 de la URL del metrics-server**
-  - Si abres en el navegador la URL que devuelve `kubectl cluster-info`, como `https://192.168.56.110:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy`, es normal que salga `Unauthorized`.
+7. **Entendiendo el 401 de la URL del metrics-server**
+  - Si abrimos en el navegador la URL que devuelve `kubectl cluster-info`, como `https://192.168.56.110:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy`, es normal que salga `Unauthorized`.
   - Esa URL es un endpoint de la API de Kubernetes, no una página web pública.
   - El navegador no lleva las credenciales/certificados de `kubectl`, así que la respuesta 401 significa que el clúster está protegiendo correctamente el acceso.
 
@@ -118,4 +116,4 @@ Es fundamental saber cómo desmantelar todo para evitar que consuma recursos en 
   ```bash
   vagrant destroy -f
   ```
-  *(Podemos borrar opcionalmente el token local generado con `rm node-token`)*
+  *(Podemos borrar opcionalmente el token local generado con `rm node-token` aunque esta ignorado en .gitignore)*
