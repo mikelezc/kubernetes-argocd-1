@@ -1,4 +1,4 @@
-# Este archivo es el "Recepcionista". Redirigirá el tráfico según el HOST
+# Este archivo es el responsable de redirigir el tráfico según el HOST a las aplicaciones correspondientes.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
