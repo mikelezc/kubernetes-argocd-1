@@ -1,18 +1,34 @@
 # Parte 2: K3s y 3 Aplicaciones Web Básicas
 
-## Conceptos Clave de K8s
 
-En la parte 1 levantamos la infraestructura básica (Nodos). En esta parte 2 damos el salto a desplegar aplicaciones reales dentro del clúster usando objetos nativos de Kubernetes. A diferencia de un simple Docker, aquí se usan varias capas de abstracción:
+A diferencia de la Parte 1 (donde desplegamos un clúster multi-nodo con Server y Worker), los requerimientos de la Parte 2 especifican la creación de **un único nodo maestro (`mlezcanoS`)**:
 
-1. **ConfigMap**: Donde guardamos la configuración en texto plano (en nuestro caso, el código HTML plano de las webs de App1, App2 y App3). Evita tener que crear imágenes de Docker personalizadas solo para cambiar un texto.
+- **IP del servidor**: `192.168.56.110` (red privada).
+- **Nombre de la VM**: `mlezcanoS` (siguiendo la nomenclatura del *Subject*: `<login>S`).
+- **Rol del nodo**: Servidor K3s único (Control Plane y ejecutor de Pods).
 
-2. **Deployment**: Es la orden de ejecución. Le decimos a Kubernetes que queremos X copias (réplicas) de tal o cuál contenedor. Kubernetes se encarga de resucitarlas si mueren. Por ejemplo, veremos que `App2` tiene **3 réplicas** funcionando simultáneamente para balancear la carga (como se exige el Subject).
+---
 
-3. **Service (ClusterIP)**: Un Deployment por sí solo no tiene una IP estable. El *Service* agrupa esos contenedores y les da un nombre local fijo (ej: `app1.default.svc`) dentro del clúster.
+# Parte 2: K3s y 3 Aplicaciones Web Básicas
 
-4. **Ingress (Traefik)**: Es el "portero" de la infraestructura (Proxy Inverso). Escucha en la IP pública del servidor y, leyendo la cabecera `Host` de la petición HTTP, decide a qué `Service` enviar el tráfico (hacia `App1` o hacia `App2`). K3s usa **Traefik** como controlador de Ingress por defecto.
+## Conceptos Clave de Kubernetes
+
+En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 damos el salto a desplegar aplicaciones dentro del clúster conectando los objetos nativos de Kubernetes en diferentes capas de abstracción:
+
+1. **ConfigMap**: Permite desacoplar la configuración del código del contenedor. En nuestro laboratorio, lo usamos para inyectar directamente el HTML plano de las webs (`App1`, `App2` y `App3`), evitando tener que construir y publicar imágenes de Docker personalizadas para cambios simples.
+
+2. **Deployment**: Define el estado deseado de la aplicación. Le indica a Kubernetes qué contenedor usar y cuántas copias (*réplicas*) mantener activas. Si un Pod falla, Kubernetes lo recrea automáticamente. Para cumplir con los requisitos del *Subject*, el Deployment de **`App2` cuenta con 3 réplicas** paralelas.
+
+3. **Service (ClusterIP)**: Proporciona un punto de acceso estable a la aplicación. Dado que los Pods son efímeros y cambian de IP al reiniciarse, el Service le asigna una IP virtual fija, un nombre DNS interno (ej. `app1-service.default.svc`) y **balancea el tráfico internamente** entre todas las réplicas del Deployment.
+
+4. **Ingress (Traefik)**: Es el punto de entrada unificado al clúster (Proxy Inverso y balanceador externo). Escucha el tráfico que llega al nodo y, analizando el dominio o la cabecera `Host` de la petición HTTP, encamina la solicitud hacia el `Service` correspondiente (`App1`, `App2` o `App3`). K3s utiliza **Traefik** como su controlador de Ingress por defecto.
+
+---
 
 ## Requisitos de la Práctica
+
+![Arquitectura](images/architecture.png)
+
 - Una única máquina `mlezcanoS` (`192.168.56.110`) actuando de Server.
 - Tres aplicaciones web corriendo.
 - Ingress configurado para:
@@ -20,135 +36,97 @@ En la parte 1 levantamos la infraestructura básica (Nodos). En esta parte 2 dam
   - `app2.com` -> Dirige a la Aplicación 2 (3 réplicas)
   - Cualquier otro host -> Dirige a la Aplicación 3 por defecto.
 
+---
+
 ## Checklist de verificación del Subject
 
 1. **Confirmamos que el `Vagrantfile` está presente y solo define 1 VM**
+
    - Comprobamos que el fichero `p2/Vagrantfile` existe.
-   - Abrimos su contenido y verificamos que solo hay `config.vm.define` para una máquina (ej. `mlezcanoS`).
+   - Abrimos su contenido y verificamos que solo hay `config.vm.define` para una máquina llamada `mlezcanoS`(requerido así por el subject).
+
+---
 
 2. **Comprobamos la distribución usada**
-   - El enunciado permite usar la versión estable más reciente de la distro de tu elección. Podemos comprobar de que el `Vagrantfile` usa una `box` razonable (por ejemplo `bento/ubuntu-22.04`).
+
+   - El enunciado permite usar la versión estable más reciente de la distro de tu elección. Podemos comprobar de que el `Vagrantfile` usa la `box` requerida `bento/ubuntu-26.04` (abril del 26).
+
+---
 
 3. **Verificamos la interfaz de red `eth1` y su IP**
-   - Entramos en la VM: `vagrant ssh mlezcanoS`.
-   - Ejecutamos `ip addr show eth1` y comprobamos que la IP es `192.168.56.110`.
+
+   - Ejecutando `vagrant status` esta vez podemos ver la única VM requerida por el subject `mlezcanoS`.
+   - Entramos al Server con `vagrant ssh mlezcanoS` (ssh sin contraseña como requiere el subject).
+   - Ejecutamos `ip addr show eth1` y comprobamos que la IP es `192.168.56.110` como requiere el subject.
+
+---
 
 4. **Verificamos el hostname**
+
    - Dentro de la VM ejecutamos `hostname` y comprobamos que devuelve `mlezcanoS`.
 
+---
+
 5. **Comprobar K3s y `kubectl`**
-   - Desde la VM ejecutamos `kubectl cluster-info`.
-   - Desde la VM ejecutamos `kubectl get nodes -o wide`, podemos verificar que aparece `mlezcanoS` (controller) con estado `Ready`.
 
-6. **Verificamos Deployments, réplicas y pods**
-   - Ejecutamos `kubectl get deploy` y comprobamos que `app1` y `app3` tienen `1/1` y que `app2` tiene `3/3` en la columna `READY`.
-   - Ejecutamos `kubectl get pods` y cuenta: 1 pod de `app1`, 3 pods de `app2` y 1 pod de `app3`.
-   - Si `app2` no tubiera 3 réplicas, mostraríamos los `events` y el `describe` del deployment para diagnosticar que ocurre (`kubectl describe deploy app2`).
+	- Desde la VM ejecutamos `kubectl cluster-info` para ver el cluster.
+	- Desde la VM ejecutamos `kubectl get nodes -o wide` para ver los nodes, podemos verificar que aparece `mlezcanoS` (controller) con estado `Ready`.
+	- Desde la VM ejecutamos `kubectl get pods -n kube-system` para listar los Pods internos de la infraestructura de K3s (no los pods de la app).
 
-7. **Verificamos el Ingress y el comportamiento por Host header**
-   - Ejecutamos `kubectl get ingress` y comprobamos que el Ingress está presente y apunta a `192.168.56.110`.
-   - Desde nuestro host (no dentro de la VM) añadimos en `/etc/hosts` las entradas para `app1.com`, `app2.com`, `app3.com` apuntando a `192.168.56.110`.
+	*- Son las mismas comprobaciones que hemos hecho en /p1*
 
-   ```
-   192.168.56.110  app1.com app2.com app3.com
-   ```
+---
 
-   - Probaremos con `curl -H "Host: app1.com" http://192.168.56.110` y `curl -H "Host: app2.com" http://192.168.56.110`.
+6. **Como inspeccionar deployments, réplicas y pods**
 
-   - Debemos recibir las respuestas correspondientes a App1, App2 (y ver variación entre réplicas en App2) y App3 para hosts no coincidentes.
+   - **Comprobamos el estado general:** Ejecutamos `kubectl get deploy` y verificamos que la columna `READY` marque `1/1` para `app1` y `app3` (una réplica por app), y **`3/3` para `app2`** (3 réplicas).
 
-8. **Verificamos que no hay ficheros extra inesperados**
-   - Lista el contenido de `p2/` y explica cualquier fichero adicional presente (por ejemplo `confs/`, `scripts/`).
+   - **Confirmamos los Pods individuales:** Con `kubectl get pods`, comprobamos la lista activa: 1 Pod de `app1`, 3 Pods de `app2` y 1 Pod de `app3`. Con `kubectl get pods -o wide` podemos ver como todos están dentro del mismo nodo.
 
+   - **Diagnóstico en caso de error:** Si `app2` no alcanzara las 3 réplicas listas, podemos inspeccionar los eventos del recurso para identificar el problema ejecutando:
+     ```bash
+     kubectl describe deployment app2
+     ```
 
-## Comandos de uso
+	- **Inspección de los logs de un pod:** Si ejecutamos `kubectl logs -f <NAME>` donde `NAME` ponemos el nombre del pod que queremos inspeccionar, podemos ver sus logs. El `NAME` lo obtenemos al hacer `kubectl get pods` (algo como "app1-84bc549d9d-8wvkq"). 
 
+---
 
-Ejecutamos Vagrant para levantar ambas máquinas:
+7. **Verificación del Ingress y enrutamiento por cabecera `Host`**
+
+   - **Comprobar la regla de Ingress:** Ejecutamos `kubectl get ingress` en la VM para confirmar que el recurso está activo y asociado a la IP `192.168.56.110`.
+   
+   - **Configuración en el Anfitrión (Host):** Para poder probar la navegación directamente desde nuestro navegador web, añadimos las entradas DNS en el archivo `/etc/hosts` de nuestra máquina física:
+     ```text
+     192.168.56.110  app1.com app2.com app3.com
+     ```
+
+   - **Validación del enrutamiento vía CLI:** Probamos el comportamiento del Ingress enviando peticiones con la cabecera `Host` directamente contra la IP del servidor. Cada dominio debe responder con el contenido HTML de su respectiva aplicación (`App1`, `App2` o `App3`).
+
+     ```bash
+     curl -H "Host: app1.com" http://192.168.56.110
+     curl -H "Host: app2.com" http://192.168.56.110
+     curl -H "Host: app3.com" http://192.168.56.110
+     ```
+   - **Verificación del balanceo de carga en App2:** Para comprobar que Traefik y el Service distribuyen el tráfico entre las 3 réplicas del Deployment, podemos ejecutar el siguiente bucle desde la terminal anfitriona:
+
+     ```bash
+     for i in {1..6}; do curl -s -H "Host: app2.com" [http://192.168.56.110](http://192.168.56.110) | grep -o 'app2-[a-z0-9]\{10\}-[a-z0-9]\{5\}'; done
+     ```
+
+     Este comando realiza 6 peticiones consecutivas extrayendo el nombre exacto del Pod que responde. Al comparar los sufijos aleatorios generados por Kubernetes (ej. `app2-575f644dc8-8xt8n`, `...-fzrtn`, `...-rxjk2`), se confirma visualmente que las solicitudes son atendidas por diferentes réplicas de forma balanceada.
+
+---
+
+8. **Comandos de limpieza y recreación de vagrant**
+
+- Apagar las máquinas (SIN destruirlas): `vagrant halt`
+- Si queremos volver a arrancarlas tras detenerlaspodemos hacer otra vez `vagrant up`.
+
+- **Para DESTRUIR por completo el clúster (Recomendado al acabar):**
 
   ```bash
-  vagrant up
+  vagrant destroy -f
   ```
-
-## Probarlo desde terminal (en otra terminal no dentro de vagrant ssh mlezcanoS)
-Dado que Ingress ya expone los puertos 80 hacia el exterior, podemos consultarlos directamente usando curl y modificando su cabecera (Header -> `-H`):
-
-```bash
-# Probar App1
-curl -H "Host: app1.com" http://192.168.56.110
-
-# Probar App2 (prueba varias veces para ver cómo balancea la carga entre réplicas)
-for i in {1..6}; do curl -s -H "Host: app2.com" http://192.168.56.110; echo; done
-
-# Probar App3 (Default genérico si el host se inventa o no coincide)
-curl -H "Host: test.test" http://192.168.56.110
-```
-
-En las tres respuestas verás el pod, la IP y el nodo. En App2, si repites la petición varias veces, también cambia el pod que responde y se ve mejor el balanceo.
-
-## Probarlo desde el navegador
-Para poder probarlo desde el navegador antes necesitarás modificar el archivo `/etc/hosts` de tu máquina anfitriona para que el sistema sepa que `app1.com`, `app2.com` y `app3.com` apuntan a la IP de la máquina virtual (`192.168.56.110`).
-
-Para ello, abre una terminal en tu Mac (no dentro de la VM) y ejecuta:
-
-```bash
-sudo nano /etc/hosts
-```
-
-Añade las siguientes líneas al final del archivo:
-
-```
-192.168.56.110 app1.com
-192.168.56.110 app2.com
-192.168.56.110 app3.com
-```
-
-Guarda el archivo (Ctrl+O, Enter) y sal (Ctrl+X).
-
-Ahora ya puedes abrir tu navegador y visitar:
-- `http://app1.com`
-- `http://app2.com`
-- `http://app3.com`
-
-## Comandos Útiles de Kubernetes
-Para poder ver el cluster por dentro debes entrar por SSH (`vagrant ssh mlezcanoS`) y probar:
-
-1. **Ver el Ingress y las rutas**:
-   ```bash
-   kubectl get ingress
-   ```
-   **Lo que verás**:
-   ```
-   NAME          CLASS    HOSTS               ADDRESS          PORTS
-   iot-ingress   <none>   app1.com,app2.com   192.168.56.110   80
-   ```
-   *¿Por qué no aparece app3.com?* 
-   
-   `app3.com` **NO** existe lógicamente en nuestro archivo. 
-   Lo que nosotros le hemos dicho a Kubernetes es "Las peticiones para app1 se van a la ruta 1, las de app2 a la ruta 2 y... **TODO lo demás (sin importar el nombre)** mételo hacia la ruta 3". 
-   Como la regla 3 es un "wildcard" (`*` o *cláusula por defecto*), Kubernetes sólo te enlista los dominios fijos en la columna `HOSTS`.
-
-2. **Ver los Deployments y Réplicas**:
-   ```bash
-   kubectl get deploy
-   ```
-   **Lo que verás**:
-   ```
-   NAME   READY   UP-TO-DATE   AVAILABLE
-   app1   1/1     1            1
-   app2   3/3     3            3
-   app3   1/1     1            1
-   ```
-   *Observación clave*: Fíjate cómo la columna `READY` de `app2` dice **3/3**. Esto confirma visualmente que le dimos la orden al *Deployment* de crear 3 réplicas idénticas (escalabilidad real).
-
-3. **Ver todos los Pods**:
-   ```bash
-   kubectl get pods
-   ```
-   **Lo que vemos**: Una lista con los nombres físicos reales (largos e irrepetibles como `app2-59787df8c8-hjjdm`) de tus pequeños mini-servidores. Verás que hay exactamente 1 de app1, 3 de app2 y 1 de app3 funcionando en aislamiento absoluto.
-
-## Limpieza y Destrucción
-Al igual que en p1, es importante apagar las máquinas para no consumir RAM en tu sistema al finalizar la práctica.
-```bash
-vagrant destroy -f
-```
+- Borrará las VMs definitivamente recuperando el almacenamiento.
+- El flag `-f` sirve para no tener que estar confirmando la destrucción de cada nodo de forma manual (full).

@@ -1,5 +1,12 @@
 #!/bin/bash
-# scripts/server.sh (Parte 2)
+# scripts/server.sh
+
+# script basado en p1/scripts/server.sh
+# para más explicaciones sobre las diferentes partes del script, 
+# es recomendable consultar el archivo p1/scripts/server.sh
+
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 set -euo pipefail
 
@@ -7,20 +14,20 @@ SERVER_IP=$1
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 
-echo "========================================================="
-echo " Instalando K3S en modo SERVER..."
-echo "========================================================="
+echo -e "${CYAN}=========================================================${NC}"
+echo -e "${CYAN} Instalando K3S en modo SERVER...${NC}"
+echo -e "${CYAN}=========================================================${NC}"
 
-# Instalamos k3s. En K3s viene instalado "Traefik" por defecto para hacer el Ingress.
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --write-kubeconfig-mode 644 \
   --node-ip $SERVER_IP \
   --bind-address $SERVER_IP \
   --flannel-iface $IFACE" sh -
 
-echo "========================================================="
-echo " Esperando a que el clúster inicie correctamente..."
-echo "========================================================="
+echo -e "${CYAN}=========================================================${NC}"
+echo -e "${CYAN} Esperando a que el clúster inicie correctamente...${NC}"
+echo -e "${CYAN}=========================================================${NC}"
+
 while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
   sleep 2
 done
@@ -28,9 +35,9 @@ done
 # Esperamos un poco a que Traefik y CoreDNS levanten para recibir configuraciones:
 sleep 15
 
-echo "========================================================="
-echo " Desplegando las 3 aplicaciones en el clúster..."
-echo "========================================================="
+echo -e "${CYAN}=========================================================${NC}"
+echo -e "${CYAN} Desplegando las 3 aplicaciones en el clúster...${NC}"
+echo -e "${CYAN}=========================================================${NC}"
 # /vagrant aquí sigue siendo la carpeta compartida P2, así que 
 # podemos aplicar los yamls de forma automática usando kubectl.
 # --kubeconfig le dice donde está la autorización del clúster.
@@ -42,4 +49,4 @@ kubectl apply -f /vagrant/confs/app2.yaml
 kubectl apply -f /vagrant/confs/app3.yaml
 kubectl apply -f /vagrant/confs/ingress.yaml
 
-echo "¡Listo! Si vas a tu Mac y usas curl probarás los hostnames app1.com y app2.com"
+echo -e "${CYAN}Instalación del Server k3s Completada!${NC}"

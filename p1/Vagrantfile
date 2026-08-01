@@ -6,12 +6,12 @@ Vagrant.configure("2") do |config|
   # Determinamos la arquitectura del sistema donde se ejecuta:
   if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64') 
 	# === MAC APPLE SILICON ===
-    config.vm.box = "bento/ubuntu-22.04"
+    config.vm.box = "bento/ubuntu-26.04"
     # Vagrant en Mac M-Series usará Parallels o VMware
     provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
   else
     # === Intel/Linux ===
-    config.vm.box = "bento/ubuntu-22.04"
+    config.vm.box = "bento/ubuntu-26.04"
     provider = "virtualbox"
   end
 
@@ -20,10 +20,10 @@ Vagrant.configure("2") do |config|
   # ==========================================
   config.vm.provider provider do |v|
     if provider == "virtualbox" || provider == "parallels"
-      v.memory = 1024
+      v.memory = 512
       v.cpus = 1
     elsif provider == "vmware_desktop"
-      v.vmx["memsize"] = "1024"
+      v.vmx["memsize"] = "512"
       v.vmx["numvcpus"] = "1"
     end
   end

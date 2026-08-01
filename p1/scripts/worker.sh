@@ -2,6 +2,10 @@
 # scripts/worker.sh
 # Este script se ejecuta tras la instalación del servidor K3s. (server.sh)
 
+# script basado en p1/scripts/server.sh
+# para más explicaciones sobre las diferentes partes del script, 
+# es recomendable consultar el archivo p1/scripts/server.sh
+
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
