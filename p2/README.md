@@ -81,7 +81,7 @@ En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 da
 
    - **Comprobamos el estado general:** Ejecutamos `kubectl get deploy` y verificamos que la columna `READY` marque `1/1` para `app1` y `app3` (una réplica por app), y **`3/3` para `app2`** (3 réplicas).
 
-   - **Confirmamos los Pods individuales:** Con `kubectl get pods`, comprobamos la lista activa: 1 Pod de `app1`, 3 Pods de `app2` y 1 Pod de `app3`. Con `kubectl get pods -o wide` podemos ver como todos están dentro del mismo nodo.
+   - **Confirmamos los Pods individuales:** Con `kubectl get pods`, comprobamos la lista activa: 1 Pod de `app1`, 3 Pods de `app2` y 1 Pod de `app3`. Con `kubectl get pods -o wide` podemos ver como todos están dentro del mismo nodo, la IP etc...
 
    - **Diagnóstico en caso de error:** Si `app2` no alcanzara las 3 réplicas listas, podemos inspeccionar los eventos del recurso para identificar el problema ejecutando:
      ```bash
@@ -100,6 +100,26 @@ En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 da
      ```text
      192.168.56.110  app1.com app2.com app3.com
      ```
+
+	- **Navegación con `app1.com`/`app2.com`/`app3.com` sin editar `/etc/hosts` (recomendado):** Si no tenemos permisos para modificar `/etc/hosts` (ej. en los equipos del campus), podemos lanzar Chrome con una regla de resolución de nombres solo para esa sesión del navegador, sin tocar ficheros del sistema ni instalar nada:
+
+	  ```bash
+	  open -a "Google Chrome" --args --host-resolver-rules="MAP app1.com 192.168.56.110, MAP app2.com 192.168.56.110, MAP app3.com 192.168.56.110"
+	  ```
+
+	  Debemos cerrar antes todas las ventanas de Chrome para que el flag se aplique. Con esto puedes navegar directamente a `http://app1.com`, `http://app2.com` y `http://app3.com`, y el propio navegador enviará el `Host` correcto sin necesidad de ninguna extensión ni regla adicional.
+
+	- **Alternativa mediante Header Editor (si no podemos lanzar Chrome con flags):** Instalaremos la extensión **Header Editor** en el navegador y crearemos una regla nueva con esta configuración:
+
+	  - **Tipo de regla:** `Modify request header`.
+	  - **Match type:** marca `Dominio` e introduce `192.168.56.110`.
+	  - **Execution → Request headers:** añade una entrada `host` → `app1.com` (o `app2.com` para la otra app).
+	  - Guardamos la regla y comprobamos que queda **activada** (interruptor en el listado principal de reglas).
+	  - Navegamos directamente a `http://192.168.56.110`; Traefik interpretará la cabecera `Host` inyectada e mostrará la web correspondiente.
+
+	  A tener en cuenta:
+	  - Como las reglas de `app1.com` y `app2.com` apuntan al mismo dominio de destino (`192.168.56.110`), **no pueden estar activas a la vez** (se pisarían entre sí). Crea una regla por app y activa solo la que quieras probar en cada momento.
+	  - **Caché del navegador:** si tras cambiar de regla activa seguimos viendo la app anterior, fuerza una recarga con `Control+Shift+R` (o desactivaremos la caché desde las DevTools → pestaña Network), ya que el navegador puede servir la respuesta cacheada sin llegar a aplicar la nueva cabecera.
 
    - **Validación del enrutamiento vía CLI:** Probamos el comportamiento del Ingress enviando peticiones con la cabecera `Host` directamente contra la IP del servidor. Cada dominio debe responder con el contenido HTML de su respectiva aplicación (`App1`, `App2` o `App3`).
 
