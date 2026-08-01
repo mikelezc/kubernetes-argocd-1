@@ -2,20 +2,21 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
+
   # Determinamos la arquitectura del sistema donde se ejecuta:
-  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
-    # === MAC APPLE SILICON (Tu M4 Pro) ===
+  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64') 
+	# === MAC APPLE SILICON ===
     config.vm.box = "bento/ubuntu-22.04"
-    # Vagrant en Mac M-Series usará Parallels o VMware (VirtualBox no existe aquí)
+    # Vagrant en Mac M-Series usará Parallels o VMware
     provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
   else
-    # === ORDENADORES DE 42 (Intel/Linux) ===
+    # === Intel/Linux ===
     config.vm.box = "bento/ubuntu-22.04"
     provider = "virtualbox"
   end
 
   # ==========================================
-  # CONFIGURACIÓN GLOBAL (Recursos)
+  # CONFIGURACIÓN GLOBAL (Especificaciones de CPU y RAM)
   # ==========================================
   config.vm.provider provider do |v|
     if provider == "virtualbox" || provider == "parallels"

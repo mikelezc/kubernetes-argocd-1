@@ -1,24 +1,30 @@
 #!/bin/bash
 # scripts/server.sh
-# K3s recomienda tener un comportamiento predecible del nodo usando las IPs de arriba
 
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Modo estricto: detiene el script ante cualquier error o variable no definida.
 set -euo pipefail
 
+# El script recibe la IP del servidor como argumento. (Vagrantfile)
 SERVER_IP=$1
+
+# Obtenemos la interfaz de red que tiene asignada la IP del servidor. (Desde la VM)
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 
-echo "========================================================="
-echo " Instalando K3S en modo SERVER en mlezcanoS..."
-echo "========================================================="
+echo -e "${CYAN}=========================================================${NC}"
+echo -e "${CYAN} Instalando K3S en modo SERVER en mlezcanoS...${NC}"
+echo -e "${CYAN}=========================================================${NC}"
 
-# Descargar e instalar k3s.
-# Explicación de los flags:
-# server: Inicia k3s como nodo maestro (controlador)
-# --write-kubeconfig-mode 644: Permite usar kubectl al usuario de vagrant sin usar sudo.
-# --node-ip=$SERVER_IP: Le dice explícitamente qué IP enrutar.
-# --bind-address=$SERVER_IP: Escucha las conexiones de k3s (API) por IP privada.
-# --flannel-iface=eth1: Le dice a Kubernetes (Flannel) por qué interfaz de red pasar el tráfico, eth1 suele ser la de private_network en Vagrant.
+# Explicación de las flags:
+# server                		: Inicia K3s en modo servidor (Control Plane).
+# --write-kubeconfig-mode 644	: Da permisos de lectura a la configuración para usar 'kubectl' sin 'sudo'.
+# --tls-san=$SERVER_IP   		: Incluye la IP privada en el certificado SSL para evitar errores de conexión segura.
+# --node-ip=$SERVER_IP   		: Le indica al clúster la IP privada exacta de esta máquina.
+# --bind-address=$SERVER_IP 	: Fuerza a la API de Kubernetes a escuchar conexiones solo en la IP privada.
+# --flannel-iface=eth1  		: Obliga a la red de Pods (Flannel) a usar la interfaz privada de Vagrant.
 
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --write-kubeconfig-mode 644 \
@@ -27,16 +33,14 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --bind-address $SERVER_IP \
   --flannel-iface $IFACE" sh -
 
-# El servidor de k3s crea un TOKEN secreto (como contraseña) que 
-# usarán los workers para poder unirse a él.
-echo "Esperando que k3s genere el node-token..."
+# Espera a que K3s genere el token que necesitarán los workers para unirse al clúster.
+echo  -e "${CYAN}Esperando el token de nodo de K3s...${NC}"
 while [ ! -f /var/lib/rancher/k3s/server/node-token ]; do
   sleep 2
 done
 
-# Copiamos ese token secreto a /vagrant
-# IMPORTANTE: /vagrant es una carpeta compartida entre el Mac y las VMs.
-# Así, el worker podrá leer el archivo `/vagrant/node-token` cuando despierte.
+# Copia el token a /vagrant (directorio compartido con la máquina anfitriona/host).
+# De este modo, los nodos worker podrán leerlo al iniciar para unirse al clúster.
 cp /var/lib/rancher/k3s/server/node-token /vagrant/node-token
 
-echo "Instalación del Server k3s Completada!"
+echo  -e "${CYAN}Instalación del Server k3s Completada!${NC}"
