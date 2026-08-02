@@ -133,249 +133,163 @@ Al terminar el script veremos lo siguiente:
 Para obtener la contraseña de Argo CD manualmente en caso de necesitarlo:
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"
 ```
 
 ---
 
-## Checklist para la Configuración
+## Checklist de verificación del Subject
 
-1. Arranque de infraestructura con ayuda del grupo.
+1. **Verificamos los namespaces requeridos**:
 
-```bash
-./scripts/install.sh
-```
+   ```bash
+   kubectl get ns
+   ```
 
-2. Revisar ficheros de configuracion en `p3/` y explicar su contenido.
+   Debe incluir `argocd` y `dev` (requeridos por el subject). 
+   
+   El resto (`default`, `kube-system`, `kube-public`, `kube-node-lease`) son namespaces propios del sistema.
 
-3. Verificar namespaces requeridos:
+---
 
-```bash
-kubectl get ns
-```
+2. **Verificamos el pod requerido en `dev`**:
 
-Debe incluir `argocd` y `dev` (requeridos por el subject).
+   ```bash
+   kubectl get pods -n dev
+   ```
 
-Namespaces adicionales normales del sistema:
+   **Namespace** es la partición lógica que organiza y aísla recursos dentro del clúster 
+   
+   **Pod** es la unidad mínima de ejecución (uno o más contenedores) que corre dentro de un nodo. Todo Pod vive dentro de un único Namespace.
 
-- `default`: namespace por defecto.
-- `kube-system`: componentes internos (CoreDNS, etc).
-- `kube-public`: datos publicos del cluster.
-- `kube-node-lease`: leases de salud de nodos.
+   Veremos por tanto el `pod` que contiene nuestra aplicación `mlezcano-playground`.
 
-4. Verificamos el único pod requerido por el subject en `dev`:
+---
 
-```bash
-kubectl get pods -n dev
-```
+3. **Verificamos que los componentes están activos**:
 
-### Diferencias entre namespace y pod:
+   - Mostramos la `Application` `iot-app` como `Synced` y `Healthy`. 
+   Si aparece `OutOfSync` o `ComparisonError`, revisamos que `repoURL` y `targetRevision` en `confs/argocd.yaml` sean correctos y que el repositorio sea público.
 
-- Namespace: particion logica del cluster para organizar y aislar recursos.
-- Pod: unidad minima de ejecucion (uno o mas contenedores) que corre en un nodo.
+		```bash
+		kubectl get applications -n argocd 
+		```
 
-5. Verificar servicios/componentes en running:
+   - Mostramos los pods de Argo CD (`server`, `repo-server`, `application-controller`...) en `Running` con `READY 1/1` (o `2/2`). Ante errores, `kubectl -n argocd describe pod <pod>` y `kubectl -n argocd logs <pod>` dan el detalle.
 
-```bash
-# Comprobamos la Application `iot-app` y su estado (sync / health)
-kubectl get applications -n argocd
+		```bash
+		kubectl get pods -n argocd 
+		```
 
-# Listamos los pods de Argo CD (repo-server, server, application-controller, ...)
-# Estos los veremos de forma mucho más gráfica en la UI de Argocd más adelante.
-kubectl get pods -n argocd
+   - Mostramos el Service que expone la app; con K3d se accede en `http://localhost:8888`. Si no responde, `kubectl -n dev port-forward svc/<service-name> 8888:<target-port>` o comprobamos que el pod esté `Running`.
 
-# Listamos los servicios en el namespace `dev` para ver el puerto que expone la app
-kubectl get svc -n dev
-```
+		```bash
+		kubectl get svc -n dev 
+		```
 
-## Explicación rápida
+---
 
-- `kubectl get applications -n argocd` : muestra la Application (por ejemplo `iot-app`) con columnas como `NAME`, `SYNC` y `HEALTH`.
-	- Qué esperar: `Synced` y `Healthy` cuando Argo CD aplicó correctamente los manifiestos.
-	- Si viéramos `OutOfSync` o `ComparisonError`: comprueba que `confs/argocd.yaml` tenga el `repoURL` y `targetRevision` correctos y que el repositorio sea público/accessible.
+4. **Verificamos que Argo CD es accesible desde el navegador** 
 
-- `kubectl get pods -n argocd` : lista los pods que componen Argo CD (argocd-server, argocd-repo-server, argocd-application-controller, etc.).
-	- Qué esperar: STATUS `Running` y READY `1/1` (o `2/2` según el pod).
-	- Si hay errores (CrashLoopBackOff, Pending): usa `kubectl -n argocd describe pod <pod>` y `kubectl -n argocd logs <pod>` para ver eventos y logs.
+	Esto lo hacemos con el login/password que facilita el grupo y que encontramos a la salida antes, al ejecutar `./scripts/install.sh`
 
-- `kubectl get svc -n dev` : muestra los servicios en `dev` (buscar el Service que expone la app, normalmente NodePort o ClusterIP).
-	- Qué esperar: un Service que mapea al puerto de la app; con k3d normalmente puedes acceder en `http://localhost:8888`.
-	- Si no es accesible: usa `kubectl -n dev port-forward svc/<service-name> 8888:<target-port>` o revisa que el pod asociado esté `Running`.
+	Es accediendo a través del puerto `8080`
 
+   `http://localhost:8080`
 
-6. Verificamos Argo CD accesible por web y login/password.
+   - El `Username`por defecto en ArgoCD es `admin`
 
-``http://localhost:8080``
+   - En caso de volver a necesitar recuperar la contraseña podemos ejecutar en terminal:
 
-7. Verificamos nombre del repo GitHub con login de 42.
+		```bash
+		kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"
+		```
 
-	``https://github.com/mikelezc/mlezcano-iot-argocd/``
+---
 
-8. Verificamos Docker Hub con login de 42 y tags `v1` y `v2`.
+5. **Navegamos la UI de Argo CD**
 
-	``https://hub.docker.com/repository/docker/mikelezc/playground/general``
+	Una vez dentro de Argo CD
 
+   - **Source**: repositorio Git, rama y ruta que Argo CD usa como fuente de la verdad.
+   - **Target**: clúster y `namespace` donde se aplican los manifiestos.
+   - **Sync**: si el clúster coincide (`Synced`) o no (`OutOfSync`) con el Source.
+   - **Health**: salud agregada de los recursos desplegados (`Healthy`, `Progressing`, `Degraded`, `Unknown`).
+   - **History**: historial de sincronizaciones, con posibilidad de rollback a un commit anterior.
 
-## Checklist de uso del cluster
+---
 
-1. Navegamos Argo CD y revisamos la interface (source, target, sync, health, history).
+6. **Verificamos el nombre del repositorio de GitHub** con el login de un miembro del equipo.
 
-**Qué significa cada campo en la UI de Argo CD**
+   `https://github.com/mikelezc/mlezcano-iot-argocd`
 
-- **Source**: el repositorio Git (URL), la rama y la ruta dentro del repo que Argo CD usa como "fuente de la verdad". Aquí están los manifiestos que describen el estado deseado del clúster.
-- **Target**: el destino donde se aplican los manifiestos (cluster y `namespace`). Permite desplegar el mismo código en varios entornos cambiando sólo el target.
-- **Sync**: indica si el estado aplicado en el clúster coincide con el `Source`. Valores habituales: `Synced` (ya aplicado) o `OutOfSync` (hay diferencias).
-- **Health**: resume la salud de los recursos de la aplicación (`Healthy`, `Progressing`, `Degraded`, `Unknown`). Argo CD agrega checks sobre Deployments, Pods, Services, etc.
-- **History**: historial de sincronizaciones y cambios aplicados desde el repo; permite ver cuándo se aplicó cada commit y hacer rollback a una versión anterior si es necesario.
+---
 
-## Guia de comprobaciones:
+7. **Verificamos Docker Hub**: login de un miembro del equipo en el nombre, y los tags `v1`/`v2` publicados.
 
-- Si la Application aparece `OutOfSync`, revisamos la rama/path en `confs/argocd.yaml` y pulsamos `Sync` en la UI o fuerza una comprobación con:
+   `https://hub.docker.com/r/mikelezc/playground`
 
-```bash
-kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
-```
+---
 
-- Para investigar fallos en `Health` o pods con errores, eventos y logs:
+10. **Comprobamos que `v1` es accesible desde esta máquina**:
 
-```bash
-kubectl -n dev get pods
-kubectl -n dev describe pod <pod-name>
-kubectl -n dev logs <pod-name>
-```
+    ```bash
+    curl http://localhost:8888/
+    ```
 
+---
 
-2. Comprobar que `v1` es accesible desde esta maquina:
+11. **Confirmamos que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales:
 
-```bash
-curl http://localhost:8888/
-```
+    ```bash
+    # El repositorio que Argo CD monitoriza de verdad (no repo-github/deployment.yaml)
+    grep -n "repoURL" confs/argocd.yaml
 
+    # La imagen publicada en Docker Hub
+    docker pull mikelezc/playground:v1
+    curl -s https://hub.docker.com/v2/repositories/mikelezc/playground/tags/ | jq '.results[].name'
 
-3. Confirmamos que la app usa Docker Hub y repo de Github
+    # La imagen que realmente usan el Deployment y los Pods en el clúster
+    kubectl -n dev get deployment mlezcano-playground -o jsonpath='{.spec.template.spec.containers[*].image}'; echo
+    kubectl -n dev get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
+    ```
 
-Desde el repositorio local (prueba rápida):
+---
 
-```bash
-# 1) Verificamos el campo `image` en el manifiesto que Argo CD monitoriza
-grep -n "image:" repo-github/deployment.yaml || sed -n '1,160p' repo-github/deployment.yaml
-```
+12. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
 
-En la configuración de Argo CD (confirmamos el repo que se está monitorizando):
+    ```yaml
+    - name: VERSION
+      value: "v2"
+    ```
 
-```bash
-grep -n "repoURL" confs/argocd.yaml || sed -n '1,120p' confs/argocd.yaml
-```
+    Commit y push. Argo CD reconcilia en pocos segundos (lo hemos ajustado así en `install.sh`); si tarda, forzamos la sincronización:
 
-Comprobación desde Docker/Docker Hub:
+    ```bash
+    kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
+    ```
 
-```bash
-# 2) Descargamos las imágenes públicas
-docker pull mikelezc/playground:v1
-docker pull mikelezc/playground:v2
+    Si además queremos recrear el Pod de la app de inmediato:
 
-# 3) Comprobar tags desde la API pública de Docker Hub (salida JSON)
-curl -s https://hub.docker.com/v2/repositories/mikelezc/playground/tags/ | jq '.results[].name'
-```
+    ```bash
+    kubectl -n dev rollout restart deployment/mlezcano-playground
+    ```
 
-Comprobación en el clúster (evidencia de que Kubernetes usa la imagen de Docker Hub):
+---
 
-```bash
-# 4) Imagen usada por el Deployment en el namespace `dev`
-kubectl -n dev get deployment mlezcano-playground -o jsonpath='{.spec.template.spec.containers[*].image}'; echo
+13. **Verificamos la app en `v2`**:
 
-# 5) Imagen(es) usadas por los pods
-kubectl -n dev get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
-```
+    ```bash
+    curl http://localhost:8888/
+    ```
 
-4. Cambiamos a `v2` editando manifiesto en GitHub y hacer commit/push.
+---
 
-5. Esperamos sincronizacion automatica (tarda unos minutos en reflejarse). 
-	Podemos forzarla manualmente si tarda en actualizar.
+14. **Limpieza**: desde la raíz del repositorio,
 
-	```bash
-	kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
-	```
+    ```bash
+    ./reset.sh p3          # borra el clúster k3d
+    ./reset.sh p3 --deep   # además limpia los contenedores/volúmenes/red de ese clúster en Docker
+    ```
 
-6. Verificar app en `v2`.
-
-## Cambio de v1 a v2 (flujo recomendado)
-
-El cambio se hace en el repo de GitHub monitorizado por Argo CD.
-
-En `deployment.yaml`, cambiar:
-
-```yaml
-- name: VERSION
-  value: "v1"
-```
-
-por:
-
-```yaml
-- name: VERSION
-  value: "v2"
-```
-
-Luego commit y push.
-
-Comprobacion:
-
-```bash
-curl http://localhost:8888/
-```
-
-## Sincronizacion automatica y fallback manual
-
-Argo CD tiene reconciliacion frecuente (configurada a pocos segundos), pero puede haber retraso breve segun ciclo/controlador.
-
-Si no sincroniza al momento, forzaremos refresh:
-
-```bash
-kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
-```
-
-Si ademas queremos recrear el pod de app inmediatamente:
-
-```bash
-kubectl -n dev rollout restart deployment/mlezcano-playground
-```
-
-## Comandos utiles durante demo
-
-```bash
-kubectl get ns
-kubectl get pods -n dev
-kubectl get applications -n argocd
-kubectl get pods -n argocd
-kubectl get deploy,svc -n dev
-curl http://localhost:8888/
-```
-
-## Limpieza y destruccion
-
-Borrado de cluster:
-
-```bash
-k3d cluster delete iot-cluster
-```
-
-Limpieza completa Docker (agresiva):
-
-```bash
-docker rm -f $(docker ps -aq)
-docker rmi -f $(docker images -aq)
-docker volume prune -f
-docker network prune -f
-```
-
-Limpieza menos agresiva:
-
-```bash
-docker container prune -f
-docker image prune -a -f
-docker volume prune -f
-docker network prune -f
-```
-
-Nota: estos comandos pueden borrar recursos de otros proyectos si comparten la misma instalacion Docker.
+    *`reset.sh` solo toca los recursos Docker cuyo nombre empieza por `k3d-iot-cluster`, así que no afecta a otros proyectos que compartan la misma instalación de Docker.*
