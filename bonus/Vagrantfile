@@ -9,7 +9,7 @@ Vagrant.configure("2") do |config|
     provider = is_arm ? "vmware_desktop" : "virtualbox"
   end
 
-  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.box = "bento/ubuntu-26.04"
 
   # ==========================================
   # CONFIGURACIÓN DE LA MÁQUINA VIRTUAL (MEMORIA, CPU)

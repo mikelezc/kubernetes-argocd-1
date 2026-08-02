@@ -72,7 +72,7 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 4. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
    - `https://hub.docker.com/r/mikelezc/playground`
 
-5. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto).
+5. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto). Incluye también [toolbox/reset.sh](toolbox/reset.sh), el script de limpieza del clúster.
 
 ---
 
@@ -322,11 +322,12 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-9. **Limpieza**: desde la raíz del repositorio,
+9. **Limpieza**: desde `p3/`,
 
     ```bash
-    ./reset.sh p3          # borra el clúster k3d
-    ./reset.sh p3 --deep   # además limpia los contenedores/volúmenes/red de ese clúster en Docker
+    ./toolbox/reset.sh          # borra el clúster k3d
+    ./toolbox/reset.sh --deep   # además limpia los contenedores/volúmenes/red de ese clúster en Docker
+    ./toolbox/reset.sh --full   # --deep + borra también la imagen del toolbox y su kubeconfig cacheado
     ```
 
-    *`reset.sh` solo toca los recursos Docker cuyo nombre empieza por `k3d-iot-cluster`, así que no afecta a otros proyectos que compartan la misma instalación de Docker.*
+    *Solo toca recursos cuyo nombre empieza por `k3d-iot-cluster` (o la imagen `iot-p3-toolbox`), así que no afecta a otros proyectos que compartan la misma instalación de Docker. No hace falta tener `k3d` instalado en el host para usarlo: si no lo encuentra, usa el propio toolbox para borrar el clúster.*
