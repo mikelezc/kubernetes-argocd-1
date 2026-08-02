@@ -40,52 +40,64 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 ---
 
-## Requisitos de la practica
+## Requisitos de la Práctica
 
-- Cluster `K3d` con namespaces `argocd` y `dev`.
-- Instalar `Argo CD` en nuestro cluster y hacerlo accesible por el navegador usando su GUI.
-- El namespace `dev` contendrá la aplicación y será desplegada por Argo CD (que estará en el namespace `argocd`).
-- El manifiesto de la aplicación vive en un repo de GitHub de donde `Argo CD` lo tomará y lo mantendrá actualizado. Este es público y tendrá el login de un miembro del equipo en el nombre (`mlezcano`).
-	``https://github.com/mikelezc/mlezcano-iot-argocd/``
-- La aplicación tiene que tener dos versiones, y se puede usar una imagen creada por nosotros mismos, creándola y subiéndola a un repositorio propio de Docker Hub.
-	``https://hub.docker.com/repository/docker/mikelezc/playground/general``
-- La imagen de Docker Hub tiene que tener los dos tags requeridos (`v1`, `v2`).
-- Cada versión tiene que tener diferencias visuales para reconocer a simple vista el cambio de versión.
-- Haremos la demostracion de cambio de version `v1` -> `v2` mediante commit/push en GitHub.
+- **Clúster**: `K3d` con namespaces `argocd` y `dev`.
+
+- **Argo CD**: instalado en el clúster y accesible desde el navegador (GUI).
+
+- **Namespace `dev`**: contiene la aplicación, desplegada por Argo CD (que vive en el namespace `argocd`).
+
+- **Repositorio GitHub**: el manifiesto de la aplicación vive en un repo público con el login de un miembro del equipo en el nombre. Argo CD lo toma de ahí y lo mantiene sincronizado.
+  - `https://github.com/mikelezc/mlezcano-iot-argocd`
+
+- **Imagen Docker Hub**: la app tiene dos versiones. Se puede usar la imagen de Wil o una propia; en nuestro caso la hemos creado y publicado en un repositorio propio ya que al desarrollar parte del proyecto en equipos ARM (Mac Mx), nos era imposible usar las imágenes de ejemplo proporcionadas.
+  - `https://hub.docker.com/r/mikelezc/playground`
+
+- **Tags**: `v1` y `v2` publicados en Docker Hub, con diferencias visuales entre versiones para reconocer el cambio a simple vista.
+
+- **Demostración**: cambio de versión `v1` -> `v2` mediante commit/push en GitHub, sin tocar el clúster a mano.
 
 ---
 
 ## Contenido de la carpeta
 
-1. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea cluster, instala Argo CD y aplica la Application.
-2. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de Argo CD Application (repo, rama, path y sync policy).
-3. [repo-github/deployment.yaml](repo-github/deployment.yaml): manifiesto que se sube al repo publico monitorizado por Argo CD.
-4. [repo-github/app.py](repo-github/app.py): aplicacion web simple con version `v1`/`v2`.
-5. [repo-github/Dockerfile](repo-github/Dockerfile): imagen de la app.
-6. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` para máquinas sin privilegios de host para instalarlos (ver más abajo).
+1. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
 
+2. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de la `Application` de Argo CD (repo, rama, path y política de sincronización).
+
+3. [repo-github/deployment.yaml](repo-github/deployment.yaml): **copia de referencia, no está en uso**. Ningún script de esta carpeta lo lee ni lo aplica; se guarda aquí solo como muestra para poder revisarlo sin salir del repositorio. El manifiesto real, el que Argo CD monitoriza y aplica en el clúster, vive en el repo de GitHub:
+   - `https://github.com/mikelezc/mlezcano-iot-argocd`
+
+4. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
+   - `https://hub.docker.com/r/mikelezc/playground`
+
+5. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto).
+
+---
 
 ## Requisitos previos
 
 1. Docker Desktop (o daemon Docker) activo.
-2. Acceso a GitHub y repo publico con nombre tipo `mlezcano-iot-argocd`.
 
-	``https://github.com/mikelezc/mlezcano-iot-argocd/``
+2. Acceso a GitHub y a un repositorio público con el login de un miembro del equipo en el nombre.
+   - `https://github.com/mikelezc/mlezcano-iot-argocd`
+   
+3. Imagen pública en Docker Hub con el login de un miembro del equipo, por ejemplo `mikelezc/playground`.
+   - `https://hub.docker.com/r/mikelezc/playground`
 
-3. Imagen Docker Hub publica con login de miembro, por ejemplo `mikelezc/playground`.
-
-	``https://hub.docker.com/repository/docker/mikelezc/playground/general``
-
-	Hemos tenido que hacer la aplicación, meterla en un contenedor y subirla a dockerhub manualmente, ya que el proyecto se ha desarrollado en un Mac con M4 pro y necesitábamos un contenedor multi arquitectura que se pudiera desplegar en máquinas con AMD y ARM.
+   Hemos construido la aplicación, la hemos metido en un contenedor y la hemos subido a Docker Hub manualmente, ya que el proyecto se ha desarrollado en un Mac con M4 Pro y necesitábamos una imagen multi-arquitectura que se pudiera desplegar tanto en máquinas AMD como ARM.
 
 4. Tags publicados en Docker Hub: `v1` y `v2`.
 
-Verificacion rapida de Docker Hub:
+Verificación rápida de Docker Hub:
 
 ```bash
 docker pull mikelezc/playground:v1
 docker pull mikelezc/playground:v2
 ```
+
+---
 
 ## Arranque de infraestructura
 
