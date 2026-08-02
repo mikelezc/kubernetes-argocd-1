@@ -1,33 +1,42 @@
 # Parte 3: K3d y Argo CD
 
-En esta parte pasamos a un flujo GitOps real:
+En la Parte 2 provisionamos con Vagrant una única VM y desplegábamos las aplicaciones contra un `Ingress` fijo. En esta Parte 3 el enunciado pide justo lo contrario: nada de Vagrant, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
 
-1. Levantaremos un cluster K3d.
-2. Instalaremos Argo CD dentro del cluster.
-3. Argo CD observa un repositorio GitHub publico con los manifiestos.
-4. Cuando cambia el manifiesto en GitHub, Argo CD reconcilia y aplica el estado deseado en Kubernetes.
-5. La app se publica con imagen en Docker Hub y se sirve en `localhost:8888`.
+Para esto se nos pide también cambiar la herramienta de clúster: en vez de instalar K3s como servicio dentro de una VM, usamos **K3d**, que ejecuta K3s dentro de contenedores Docker. 
 
-en esta parte, la idea es demostrar un flujo despliegue automatizado con trazabilidad bajo el paradigma de GitOps:
+El flujo completo quedaría de la siguiente manera:
+
+1. Levantamos un clúster K3d (K3s corriendo en contenedores, sin VM).
+2. Instalamos Argo CD dentro del clúster.
+3. Argo CD observa un repositorio de GitHub público con los manifiestos.
+4. Cuando cambia el manifiesto en GitHub, Argo CD reconcilia y aplica el estado deseado en el clúster.
+5. La app se publica con una imagen en Docker Hub y se sirve en `localhost:8888`.
 
 ```
-GitHub (estado deseado) -> Argo CD (reconciliacion) -> cluster (estado real).
+GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 ```
---- 
+
+---
 
 ## Conceptos Clave
 
-1. **K3s**
+1. **K3s vs K3d**: K3s es la distribución ligera de Kubernetes en sí; en las Partes 1 y 2 la instalamos directamente dentro de una VM. K3d es un *wrapper* que ejecuta ese mismo K3s dentro de contenedores Docker: cada "nodo" del clúster es, en realidad, un contenedor. El único prerrequisito real es tener Docker funcionando, por lo que un clúster completo arranca y se destruye sin provisionar ni mantener una VM dedicada.
 
-2. **namespace**
+2. **Namespace**: partición lógica del clúster para organizar y aislar recursos. En esta parte usamos dos: `argocd` (donde vive el propio controlador) y `dev` (donde Argo CD despliega nuestra aplicación).
 
-3. **gitops**
+3. **GitOps**: paradigma en el que un repositorio Git es la única fuente de verdad del estado deseado de la infraestructura. Nadie ejecuta `kubectl apply` a mano: se edita el manifiesto, se hace commit y push, y un controlador dentro del clúster (aquí, Argo CD) se encarga de que el estado real converja con lo declarado en el repo.
 
-4. **manifest**
+4. **Manifiesto (manifest)**: fichero YAML declarativo que describe un recurso de Kubernetes (`Deployment`, `Application`...). En GitOps, el manifiesto en Git es la "orden de trabajo"; el clúster solo refleja lo que ese fichero dice.
 
-5. **tagin**
+5. **Argo CD y su objeto `Application`**: es el controlador GitOps del proyecto. Corre dentro del propio clúster y usa un CRD llamado `Application` (nuestro `confs/argocd.yaml`) para saber qué repo vigilar, en qué `namespace` desplegar y con qué política de sincronización. En la UI, `Sync` indica si el clúster coincide con el repo y `Health` si los recursos desplegados están realmente sanos.
 
-6. **bootstrap**
+	*Un CRD (Custom Resource Definition, o Definición de Recurso Personalizado) es una característica de Kubernetes que nos permite extender la API nativa de Kubernetes creando nuestros propios tipos de objetos personalizados.*
+
+6. **Tagging de imágenes**: versionar una imagen Docker asignándole una etiqueta (`v1`, `v2`). Aquí es lo que distingue una versión de la app de la otra; cambiar de versión es tan simple como cambiar el tag en el manifiesto.
+
+7. **Bootstrap**: script (`scripts/install.sh`) que automatiza de principio a fin la creación del entorno: instala dependencias, crea el clúster K3d, instala Argo CD y aplica la `Application`. Es idempotente: se puede volver a ejecutar sin dejar el clúster en un estado inconsistente.
+
+8. **Docker outside of Docker (DooD)**: patrón que usa nuestro `toolbox/` para dar `kubectl`/`k3d` en máquinas sin privilegios. En vez de correr un daemon Docker anidado dentro del contenedor (*Docker in Docker*), montamos el socket del Docker del host (`/var/run/docker.sock`). Así, los contenedores que crea K3d los lanza el Docker real del host, no uno anidado, y los puertos publicados quedan accesibles en el `localhost` de la máquina exactamente igual que sin el toolbox.
 
 ---
 
