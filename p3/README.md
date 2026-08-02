@@ -274,15 +274,19 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 7. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
 
-   Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml. Hay que cambiar **los dos campos que identifican la versión, no solo uno**: el `image` (el tag de Docker Hub) y el `env VERSION` (lo que de verdad decide qué HTML sirve `app.py` en tiempo de ejecución). Si solo tocamos el `env`, la app ya responde en `v2`, pero el campo `IMAGES` de Argo CD y el `image` que devuelve `kubectl` se quedan apuntando a `v1`, dando la falsa impresión de que el cambio no se ha aplicado del todo:
+   Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml. 
+   
+   Hay que cambiar **los dos campos que identifican la versión, no solo uno**: 
+   
+   El `image` (el tag de Docker Hub) y el `env VERSION` (lo que de verdad decide qué HTML sirve `app.py` en tiempo de ejecución). Si solo tocamos el `env`, la app ya responde en `v2`, pero el campo `IMAGES` de Argo CD y el `image` que devuelve `kubectl` se quedan apuntando a `v1`, dando la falsa impresión de que el cambio no se ha aplicado del todo:
 
    ```yaml
    containers:
    - name: mlezcano-playground
-     image: mikelezc/playground:v2   # <- también este campo
+     image: mikelezc/playground:v2		# <- también este campo
      env:
      - name: VERSION
-       value: "v2"
+       value: "v2" 						# <- también este campo
    ```
 
    Commit y push. Argo CD reconcilia en pocos segundos.
@@ -298,7 +302,9 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    kubectl -n dev rollout restart deployment/mlezcano-playground
    ```
 
-   *(sugerencia de captura pendiente: panel **HISTORY AND ROLLBACK** de Argo CD tras el cambio, mostrando las dos sincronizaciones — `images/history.png`)*
+   El panel **HISTORY AND ROLLBACK** de Argo CD registra cada sincronización con su revisión de Git, autor, commit y cuánto tiempo llevó activa cada una — de aquí se puede hacer rollback a cualquier entrada anterior:
+
+   ![Historial de sincronizaciones de iot-app en Argo CD](images/history.png)
 
 ---
 
@@ -308,7 +314,11 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    curl http://localhost:8888/
    ```
 
-   *(sugerencia de captura pendiente: navegador o `curl` mostrando la respuesta de `v1` y `v2` una junto a la otra, como evidencia visual del cambio — `images/app-v1.png` / `images/app-v2.png`)*
+   La diferencia es reconocible a simple vista: fondo verde y "VERSION 1" en `v1`, fondo azul y "VERSION 2" en `v2`, además del mensaje de bienvenida y el JSON de estado:
+
+   | `v1` | `v2` |
+   |---|---|
+   | ![App en versión 1](images/app-v1.png) | ![App en versión 2](images/app-v2.png) |
 
 ---
 
