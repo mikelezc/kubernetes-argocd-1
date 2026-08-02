@@ -166,72 +166,82 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-3. **Verificamos que los componentes están activos**:
+3. **Verificamos que Argo CD está funcionando y desplegando lo correcto** P
 
-   - Mostramos la `Application` `iot-app` como `Synced` y `Healthy`. 
-   Si aparece `OutOfSync` o `ComparisonError`, revisamos que `repoURL` y `targetRevision` en `confs/argocd.yaml` sean correctos y que el repositorio sea público.
+### Primero por `kubectl` (es decir, por terminal):
 
-		```bash
-		kubectl get applications -n argocd 
-		```
+   - La `Application` `iot-app` debe aparecer como `Synced` y `Healthy`.
 
-   - Mostramos los pods de Argo CD (`server`, `repo-server`, `application-controller`...) en `Running` con `READY 1/1` (o `2/2`). Ante errores, `kubectl -n argocd describe pod <pod>` y `kubectl -n argocd logs <pod>` dan el detalle.
+     ```bash
+     kubectl get applications -n argocd
+     ```
 
-		```bash
-		kubectl get pods -n argocd 
-		```
+	 Si apareciera `OutOfSync` o `ComparisonError`, tendríamos que revisar `repoURL` y `targetRevision` en `confs/argocd.yaml` para que sean correctos y que el repositorio sea público.
 
-   - Mostramos el Service que expone la app; con K3d se accede en `http://localhost:8888`. Si no responde, `kubectl -n dev port-forward svc/<service-name> 8888:<target-port>` o comprobamos que el pod esté `Running`.
+	 ---
 
-		```bash
-		kubectl get svc -n dev 
-		```
+   - Los pods de Argo CD (`server`, `repo-server`, `application-controller`...) deben estar en `Running` con `READY 1/1` (o `2/2` si fuera el caso).
 
----
+     ```bash
+     kubectl get pods -n argocd
+     ```
 
-4. **Verificamos que Argo CD es accesible desde el navegador** 
+	 Ante errores, `kubectl -n argocd describe pod <pod>` y `kubectl -n argocd logs <pod>` nos darían detalles para solucionarlo.
 
-	Esto lo hacemos con el login/password que facilita el grupo y que encontramos a la salida antes, al ejecutar `./scripts/install.sh`
+	 ---
 
-	Es accediendo a través del puerto `8080`
+   - Debe existir el Service que expone la app; con K3d se accede en `http://localhost:8888`.
 
-   `http://localhost:8080`
+     ```bash
+     kubectl get svc -n dev
+     ```
 
-   - El `Username`por defecto en ArgoCD es `admin`
+	 Si no responde, `kubectl -n dev port-forward svc/<service-name> 8888:<target-port>` o comprobamos que el pod esté `Running`.
 
-   - En caso de volver a necesitar recuperar la contraseña podemos ejecutar en terminal:
+	 ---
 
-		```bash
-		kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"
-		```
+   ### Lo mismo, ahora desde el navegador: 
+   
+   Accedemos a `http://localhost:8080` con el `Username` `admin` y el password que facilita el grupo (el mismo que imprime `install.sh` al terminar).
 
----
+   *Nota: Recuerda que si hemos perdido el password podrmeos recuperarlo en todo momento poniendo en la terminal:* `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"`
+   
+   
+   **Vista de árbol de la `Application` `iot-app`** 
 
-5. **Navegamos la UI de Argo CD**
+   ![Árbol de recursos de iot-app en Argo CD](images/ArgoCD1.png)
 
-	Una vez dentro de Argo CD
+   - **APP HEALTH** `Healthy` y **SYNC STATUS** `Synced to main`: equivale a lo que acabamos de ver por `kubectl`.
 
-   - **Source**: repositorio Git, rama y ruta que Argo CD usa como fuente de la verdad.
-   - **Target**: clúster y `namespace` donde se aplican los manifiestos.
-   - **Sync**: si el clúster coincide (`Synced`) o no (`OutOfSync`) con el Source.
-   - **Health**: salud agregada de los recursos desplegados (`Healthy`, `Progressing`, `Degraded`, `Unknown`).
-   - **History**: historial de sincronizaciones, con posibilidad de rollback a un commit anterior.
-
----
-
-6. **Verificamos el nombre del repositorio de GitHub** con el login de un miembro del equipo.
-
-   `https://github.com/mikelezc/mlezcano-iot-argocd`
+   - El árbol es la misma jerarquía de objetos de Kubernetes que vimos en la Parte 2, ahora gestionada por Argo CD en vez de a mano: 
+   
+		La `Application` despliega un `Service` y un `Deployment`.
+		El `Deployment` gestiona un `ReplicaSet`, que gestiona el `Pod`
+		El `Service` apunta a ese Pod mediante un `Endpoints`/`EndpointSlice`.
 
 ---
 
-7. **Verificamos Docker Hub**: login de un miembro del equipo en el nombre, y los tags `v1`/`v2` publicados.
+
+   Pulsando sobre el nodo `iot-app` accedemos al resumen (`SUMMARY`), donde confirmamos de un vistazo el repositorio de GitHub que Argo CD monitoriza de verdad y la imagen desplegada:
+
+   ![Resumen de iot-app: repositorio de GitHub e imagen en uso](images/app.png)
+
+   - **REPO URL** / **TARGET REVISION** / **PATH** (el *Source*): repositorio público de GitHub con el login de un miembro del equipo, rama `main` — `https://github.com/mikelezc/mlezcano-iot-argocd`.
+   - **CLUSTER** / **NAMESPACE** (el *Target*): despliega en el namespace `dev` de nuestro propio clúster.
+   - **STATUS** / **HEALTH**: los mismos `Synced`/`Healthy` que en la vista de árbol.
+   - **IMAGES**: tag de Docker Hub corriendo ahora mismo en el clúster — `mikelezc/playground:v1`.
+
+   El campo que falta, **HISTORY AND ROLLBACK** (historial de sincronizaciones, con posibilidad de rollback a un commit anterior), lo veremos más abajo al cambiar de `v1` a `v2`.
+
+---
+
+4. **Verificamos Docker Hub directamente**: repositorio público con el login de un miembro del equipo y los dos tags requeridos ya publicados (no solo el que está corriendo).
 
    `https://hub.docker.com/r/mikelezc/playground`
 
 ---
 
-10. **Comprobamos que `v1` es accesible desde esta máquina**:
+5. **Comprobamos que `v1` es accesible desde esta máquina**:
 
     ```bash
     curl http://localhost:8888/
@@ -239,7 +249,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-11. **Confirmamos que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales:
+6. **Confirmamos por CLI que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales:
 
     ```bash
     # El repositorio que Argo CD monitoriza de verdad (no repo-github/deployment.yaml)
@@ -256,36 +266,40 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-12. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
+7. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
 
-    ```yaml
-    - name: VERSION
-      value: "v2"
-    ```
+   ```yaml
+   - name: VERSION
+     value: "v2"
+   ```
 
-    Commit y push. Argo CD reconcilia en pocos segundos (lo hemos ajustado así en `install.sh`); si tarda, forzamos la sincronización:
+   Commit y push. Argo CD reconcilia en pocos segundos (lo hemos ajustado así en `install.sh`); si tarda, forzamos la sincronización:
 
-    ```bash
-    kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
-    ```
+   ```bash
+   kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
+   ```
 
-    Si además queremos recrear el Pod de la app de inmediato:
+   Si además queremos recrear el Pod de la app de inmediato:
 
-    ```bash
-    kubectl -n dev rollout restart deployment/mlezcano-playground
-    ```
+   ```bash
+   kubectl -n dev rollout restart deployment/mlezcano-playground
+   ```
 
----
-
-13. **Verificamos la app en `v2`**:
-
-    ```bash
-    curl http://localhost:8888/
-    ```
+   *(sugerencia de captura pendiente: panel **HISTORY AND ROLLBACK** de Argo CD tras el cambio, mostrando las dos sincronizaciones — `images/history.png`)*
 
 ---
 
-14. **Limpieza**: desde la raíz del repositorio,
+8. **Verificamos la app en `v2`**, y que hay diferencia visual respecto a `v1`:
+
+   ```bash
+   curl http://localhost:8888/
+   ```
+
+   *(sugerencia de captura pendiente: navegador o `curl` mostrando la respuesta de `v1` y `v2` una junto a la otra, como evidencia visual del cambio — `images/app-v1.png` / `images/app-v2.png`)*
+
+---
+
+9. **Limpieza**: desde la raíz del repositorio,
 
     ```bash
     ./reset.sh p3          # borra el clúster k3d
