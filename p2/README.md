@@ -9,8 +9,6 @@ A diferencia de la Parte 1 (donde desplegamos un clúster multi-nodo con Server 
 
 ---
 
-# Parte 2: K3s y 3 Aplicaciones Web Básicas
-
 ## Conceptos Clave de Kubernetes
 
 En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 damos el salto a desplegar aplicaciones dentro del clúster conectando los objetos nativos de Kubernetes en diferentes capas de abstracción:

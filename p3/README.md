@@ -1,26 +1,52 @@
 # Parte 3: K3d y Argo CD
 
-## Conceptos Clave
-
 En esta parte pasamos a un flujo GitOps real:
 
-1. Levantamos un cluster K3d ligero.
-2. Instalamos Argo CD dentro del cluster.
+1. Levantaremos un cluster K3d.
+2. Instalaremos Argo CD dentro del cluster.
 3. Argo CD observa un repositorio GitHub publico con los manifiestos.
 4. Cuando cambia el manifiesto en GitHub, Argo CD reconcilia y aplica el estado deseado en Kubernetes.
 5. La app se publica con imagen en Docker Hub y se sirve en `localhost:8888`.
 
-La idea es demostrar despliegue automatizado con trazabilidad: GitHub (estado deseado) -> Argo CD (reconciliacion) -> cluster (estado real).
+en esta parte, la idea es demostrar un flujo despliegue automatizado con trazabilidad bajo el paradigma de GitOps:
+
+```
+GitHub (estado deseado) -> Argo CD (reconciliacion) -> cluster (estado real).
+```
+--- 
+
+## Conceptos Clave
+
+1. **K3s**
+
+2. **namespace**
+
+3. **gitops**
+
+4. **manifest**
+
+5. **tagin**
+
+6. **bootstrap**
+
+---
 
 ## Requisitos de la practica
 
-- Cluster K3d con namespaces `argocd` y `dev`.
-- Argo CD instalado y accesible por navegador.
-- Repositorio GitHub publico con login de un miembro en el nombre.
-- Imagen Docker Hub con login de un miembro y dos tags requeridos (`v1`, `v2`).
-- Demostracion de cambio de version `v1` -> `v2` mediante commit/push en GitHub.
+- Cluster `K3d` con namespaces `argocd` y `dev`.
+- Instalar `Argo CD` en nuestro cluster y hacerlo accesible por el navegador usando su GUI.
+- El namespace `dev` contendrá la aplicación y será desplegada por Argo CD (que estará en el namespace `argocd`).
+- El manifiesto de la aplicación vive en un repo de GitHub de donde `Argo CD` lo tomará y lo mantendrá actualizado. Este es público y tendrá el login de un miembro del equipo en el nombre (`mlezcano`).
+	``https://github.com/mikelezc/mlezcano-iot-argocd/``
+- La aplicación tiene que tener dos versiones, y se puede usar una imagen creada por nosotros mismos, creándola y subiéndola a un repositorio propio de Docker Hub.
+	``https://hub.docker.com/repository/docker/mikelezc/playground/general``
+- La imagen de Docker Hub tiene que tener los dos tags requeridos (`v1`, `v2`).
+- Cada versión tiene que tener diferencias visuales para reconocer a simple vista el cambio de versión.
+- Haremos la demostracion de cambio de version `v1` -> `v2` mediante commit/push en GitHub.
 
-## Que tenemos en esta carpeta
+---
+
+## Contenido de la carpeta
 
 1. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea cluster, instala Argo CD y aplica la Application.
 2. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de Argo CD Application (repo, rama, path y sync policy).
