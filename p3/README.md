@@ -213,11 +213,19 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
    - **APP HEALTH** `Healthy` y **SYNC STATUS** `Synced to main`: equivale a lo que acabamos de ver por `kubectl`.
 
-   - El árbol es la misma jerarquía de objetos de Kubernetes que vimos en la Parte 2, ahora gestionada por Argo CD en vez de a mano: 
-   
-		La `Application` despliega un `Service` y un `Deployment`.
-		El `Deployment` gestiona un `ReplicaSet`, que gestiona el `Pod`
-		El `Service` apunta a ese Pod mediante un `Endpoints`/`EndpointSlice`.
+   - El árbol es la misma jerarquía de objetos de Kubernetes que vimos en la Parte 2, ahora gestionada por Argo CD en vez de a mano:
+
+     - **`Application`** (`iot-app`): el objeto raíz de Argo CD, el que agrupa y sincroniza todo lo demás.
+
+     - **`Deployment`** (`mlezcano-playground`): declara qué imagen correr y cuántas réplicas mantener vivas.
+
+     - **`ReplicaSet`**: objeto intermedio que crea y vigila el `Deployment` para asegurar que el número de réplicas declarado esté siempre corriendo.
+
+     - **`Pod`**: la unidad real en ejecución (el contenedor con nuestra app), gestionada por el `ReplicaSet`.
+
+     - **`Service`** (`mlezcano-playground`): la IP/nombre estable que expone la app hacia fuera del `Pod`.
+
+     - **`Endpoints`/`EndpointSlice`**: la lista de IPs de Pod concretas a las que apunta el `Service` en cada momento; se actualiza sola cada vez que el `Pod` cambia.
 
 ---
 
@@ -247,7 +255,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-6. **Confirmamos por CLI que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales:
+6. **Confirmamos por CLI que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales. Los siguientes comandos se ejecutan desde `p3/` (o desde `/workspace` si estamos dentro del toolbox). Si `grep` da `No such file or directory`, es que estamos en otra carpeta:
 
     ```bash
     # El repositorio que Argo CD monitoriza de verdad (no repo-github/deployment.yaml)
@@ -266,11 +274,15 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 7. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
 
-   Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml.
+   Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml. Hay que cambiar **los dos campos que identifican la versión, no solo uno**: el `image` (el tag de Docker Hub) y el `env VERSION` (lo que de verdad decide qué HTML sirve `app.py` en tiempo de ejecución). Si solo tocamos el `env`, la app ya responde en `v2`, pero el campo `IMAGES` de Argo CD y el `image` que devuelve `kubectl` se quedan apuntando a `v1`, dando la falsa impresión de que el cambio no se ha aplicado del todo:
 
    ```yaml
-   - name: VERSION
-     value: "v2"
+   containers:
+   - name: mlezcano-playground
+     image: mikelezc/playground:v2   # <- también este campo
+     env:
+     - name: VERSION
+       value: "v2"
    ```
 
    Commit y push. Argo CD reconcilia en pocos segundos.
