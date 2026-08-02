@@ -231,8 +231,6 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    - **STATUS** / **HEALTH**: los mismos `Synced`/`Healthy` que en la vista de árbol.
    - **IMAGES**: tag de Docker Hub corriendo ahora mismo en el clúster — `mikelezc/playground:v1`.
 
-   El campo que falta, **HISTORY AND ROLLBACK** (historial de sincronizaciones, con posibilidad de rollback a un commit anterior), lo veremos más abajo al cambiar de `v1` a `v2`.
-
 ---
 
 4. **Verificamos Docker Hub directamente**: repositorio público con el login de un miembro del equipo y los dos tags requeridos ya publicados (no solo el que está corriendo).
@@ -268,12 +266,15 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 7. **Cambiamos de `v1` a `v2`** editando `deployment.yaml` en el repositorio de GitHub (no en la copia local):
 
+   Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml.
+
    ```yaml
    - name: VERSION
      value: "v2"
    ```
 
-   Commit y push. Argo CD reconcilia en pocos segundos (lo hemos ajustado así en `install.sh`); si tarda, forzamos la sincronización:
+   Commit y push. Argo CD reconcilia en pocos segundos.
+   Si tarda, podemos forzar la sincronización:
 
    ```bash
    kubectl -n argocd annotate application iot-app argocd.argoproj.io/refresh=hard --overwrite
