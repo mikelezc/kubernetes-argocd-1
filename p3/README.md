@@ -82,7 +82,7 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 2. Acceso a GitHub y a un repositorio público con el login de un miembro del equipo en el nombre.
    - `https://github.com/mikelezc/mlezcano-iot-argocd`
-   
+
 3. Imagen pública en Docker Hub con el login de un miembro del equipo, por ejemplo `mikelezc/playground`.
    - `https://hub.docker.com/r/mikelezc/playground`
 
@@ -90,39 +90,25 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 4. Tags publicados en Docker Hub: `v1` y `v2`.
 
-Verificación rápida de Docker Hub:
-
-```bash
-docker pull mikelezc/playground:v1
-docker pull mikelezc/playground:v2
-```
-
 ---
 
 ## Arranque de infraestructura
 
-Desde `p3/`:
+Desde `p3/`, con privilegios de root:
 
 ```bash
 ./scripts/install.sh
 ```
 
-### Alternativa sin privilegios de host (cluster de 42)
+El script detecta el sistema operativo (`Darwin`/`Linux`), instala Docker/`kubectl`/`k3d` si faltan (con `sudo`), crea el clúster K3d, instala Argo CD y aplica la `Application`.
 
-`scripts/install.sh` instala `kubectl` y `k3d` directamente en el host, lo que
-requiere `sudo`. En máquinas donde `docker` funciona sin sudo pero no hay
-privilegios para instalar paquetes de sistema (como en el cluster de 42), se
-puede usar el toolbox en `toolbox/`: una imagen Docker con `kubectl` y `k3d`
-ya instalados, que se ejecuta montando el socket de Docker del host
-(`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. Así,
-el clúster k3d se crea igualmente como contenedores del Docker del host (no
-anidados), y los puertos publicados (8080, 8888) quedan accesibles en el
-`localhost` real de la máquina, exactamente igual que con la instalación
-directa.
+---
 
-`scripts/install.sh` no cambia: sus comprobaciones `command -v kubectl/k3d`
-encuentran los binarios ya presentes en la imagen del toolbox y omiten la
-instalación.
+### Alternativa sin privilegios de host
+
+Si no hay privilegios para instalar `kubectl`/`k3d` en el sistema, usamos el toolbox en `toolbox/`: una imagen Docker con ambos ya instalados, que se ejecuta montando el socket de Docker del host (`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. El clúster K3d se crea igual como contenedores del Docker del host (no anidados), y los puertos publicados (8080, 8888) quedan accesibles en el `localhost` real de la máquina, exactamente igual que con la instalación directa.
+
+`scripts/install.sh` no cambia: sus comprobaciones `command -v kubectl/k3d` encuentran los binarios ya presentes en la imagen del toolbox y omiten la instalación.
 
 ```bash
 ./toolbox/run.sh ./scripts/install.sh
@@ -135,6 +121,8 @@ También sirve para lanzar comandos sueltos con las herramientas ya listas:
 ./toolbox/run.sh   # shell interactiva con kubectl/k3d/docker(cliente)/git/jq
 ```
 
+---
+
 Al terminar el script veremos lo siguiente:
 
 - Argo CD: `http://localhost:8080`
@@ -142,11 +130,13 @@ Al terminar el script veremos lo siguiente:
 - Usuario Argo CD: `admin`
 - Password: la imprime el script al final
 
-Para obtener password de argocd manualmente en caso de necesitarlo:
+Para obtener la contraseña de Argo CD manualmente en caso de necesitarlo:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 ```
+
+---
 
 ## Checklist para la Configuración
 
