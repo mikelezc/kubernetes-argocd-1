@@ -1,6 +1,4 @@
 #!/bin/bash
-# Script para crear el proyecto en GitLab, generar un PAT y hacer push
-# del manifiesto inicial.
 
 set -euo pipefail
 

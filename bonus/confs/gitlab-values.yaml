@@ -5,6 +5,8 @@ global:
   hosts:
     domain: localhost
     https: false
+  ingress:
+    class: traefik               # si no, cada "helm upgrade" vuelve a dejar los Ingress sin clase y GitLab deja de responder
 installCertmanager: false
 certmanager-issuer:
   email: admin@gitlab.local     # aunque no lo usaremos porque no habilitamos HTTPS, evita un error de TLS al instalar cert-manager
@@ -24,16 +26,5 @@ gitlab:
   gitlab-shell:
     minReplicas: 1
     maxReplicas: 1
-  # minio:
-  #   image:
-  #     repository: minio/minio
-  #     tag: latest
-  #   resources:
-  #     requests:
-  #       cpu: 100m
-  #       memory: 256Mi
-  #     limits:
-  #       cpu: 200m
-  #       memory: 512Mi
 registry:
   enabled: false

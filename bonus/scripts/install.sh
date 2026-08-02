@@ -1,6 +1,4 @@
 #!/bin/bash
-# Este script instala herramientas, crear cluster k3d iot-bonus,
-# desplegará GitLab (namespace gitlab) y Argo CD (namespace argocd).
 
 set -e
 
@@ -82,24 +80,29 @@ else
     VALUES_PATH="../confs/gitlab-values.yaml"
 fi
 
+MINIO_ARCH_ARGS=()
+case "$(uname -m)" in
+    aarch64|arm64)
+        MINIO_ARCH_ARGS=(
+            --set "minio.imageTag=RELEASE.2020-09-21T22-31-59Z-arm64"
+            --set "minio.minioMc.tag=RELEASE.2020-09-23T20-02-13Z-arm64"
+        )
+        MC_IMAGE="registry.gitlab.com/gitlab-org/cloud-native/mirror/images/minio/mc:RELEASE.2020-09-23T20-02-13Z-arm64"
+        ;;
+    *)
+        MC_IMAGE="minio/mc:RELEASE.2018-07-13T00-53-22Z"
+        ;;
+esac
+
 if ! helm upgrade --install gitlab gitlab/gitlab \
     --version 9.9.0 \
     --timeout 600s \
     --namespace gitlab \
-    -f "$VALUES_PATH"; then
+    -f "$VALUES_PATH" \
+    "${MINIO_ARCH_ARGS[@]}"; then
     echo "Error: GitLab no se pudo instalar con Helm."
     exit 1
 fi
-
-echo "Parcheando Ingress de GitLab a clase traefik..."
-for INGRESS in gitlab-webservice-default gitlab-kas gitlab-minio; do
-    if kubectl -n gitlab patch ingress "$INGRESS" \
-        --type=merge -p '{"spec":{"ingressClassName":"traefik"}}' 2>/dev/null; then
-        log_ok "$INGRESS parcheado"
-    else
-        log_ok "$INGRESS ya estaba parcheado"
-    fi
-done
 
 echo "Esperando pod MinIO..."
 kubectl -n gitlab wait --for=condition=ready pod \
@@ -112,6 +115,8 @@ else
     log_warn "MinIO aún no expone el endpoint — se probará igualmente"
 fi
 
+kubectl -n gitlab delete job -l app=minio,release=gitlab --ignore-not-found >/dev/null 2>&1
+
 echo "Inicializando buckets MinIO..."
 ACCESS_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
     -o jsonpath="{.data.accesskey}" | base64 -d 2>/dev/null || echo "minioadmin")
@@ -120,7 +125,7 @@ SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
 
 for attempt in 1 2 3; do
     if kubectl -n gitlab run mc-init --rm -i --restart=Never \
-        --image=minio/mc:latest \
+        --image="$MC_IMAGE" \
         --command -- /bin/sh -c "
             mc alias set myminio http://gitlab-minio-svc.gitlab.svc:9000 \
                 '$ACCESS_KEY' '$SECRET_KEY' >/dev/null 2>&1
@@ -129,7 +134,9 @@ for attempt in 1 2 3; do
                       gitlab-terraform-state gitlab-ci-secure-files \
                       gitlab-dependency-proxy gitlab-pages; do
                 mc mb myminio/\$b >/dev/null 2>&1 || true
-                mc policy none myminio/\$b >/dev/null 2>&1 || true
+                # La sintaxis de 'mc policy' cambió entre versiones (antigua: sin 'set',
+                # moderna: con 'set'); probamos las dos, cualquiera de las dos que valga.
+                mc policy set none myminio/\$b >/dev/null 2>&1 || mc policy none myminio/\$b >/dev/null 2>&1 || true
             done
         " >/dev/null 2>&1; then
         break
@@ -189,7 +196,7 @@ log_section "5/5 — Contraseña inicial de GitLab"
 
 ROOT_SECRET="gitlab-gitlab-initial-root-password"
 echo "Esperando secret con contraseña root de GitLab..."
-for i in $(seq 1 24); do
+for _ in $(seq 1 24); do
     kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1 && break
     sleep 5
 done
