@@ -162,7 +162,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ## Checklist de verificación del Subject
 
-**Nota** Para hacer todas las comprobaciones por consola, entraremos antes de nada a la VM con `vagrant ssh mlezcanoS`
+*Nota: Para hacer todas las comprobaciones por consola, entraremos antes de nada a la VM con `vagrant ssh mlezcanoS`*
 
 1. **Verificamos los namespaces requeridos**:
 
