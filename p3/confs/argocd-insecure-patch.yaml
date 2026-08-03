@@ -1,0 +1,4 @@
+# Hace que argocd-server sirva HTTP plano en vez de HTTPS autofirmado, para
+# no lidiar con avisos de certificado en el navegador durante la demo.
+data:
+  server.insecure: "true"

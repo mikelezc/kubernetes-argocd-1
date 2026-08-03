@@ -64,17 +64,23 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 1. [Vagrantfile](Vagrantfile): define la VM sobre la que corre K3d (`P3_MEMORY`/`P3_CPUS` para el tamaño, 2048MB/2CPU por defecto) y monta también `../bonus` en `/bonus`, para que el bonus pueda extender esta misma VM más adelante.
 
-3. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
+2. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
 
-4. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de la `Application` de Argo CD (repo, rama, path y política de sincronización).
+3. [confs/namespaces.yaml](confs/namespaces.yaml): los namespaces `argocd` y `dev`.
 
-5. [repo-github/deployment.yaml](repo-github/deployment.yaml): **copia de referencia, no está en uso**. Ningún script de esta carpeta lo lee ni lo aplica; se guarda aquí solo como muestra para poder revisarlo sin salir del repositorio. El manifiesto real, el que Argo CD monitoriza y aplica en el clúster, vive en el repo de GitHub:
+4. [confs/argocd-ingress.yaml](confs/argocd-ingress.yaml): Ingress que expone Argo CD por HTTP a través de Traefik.
+
+5. [confs/argocd-reconciliation-patch.yaml](confs/argocd-reconciliation-patch.yaml) y [confs/argocd-insecure-patch.yaml](confs/argocd-insecure-patch.yaml): parches (`kubectl patch --patch-file`) que bajan la reconciliación de Argo CD a 5s y le hacen servir HTTP plano en vez de HTTPS autofirmado.
+
+6. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de la `Application` de Argo CD (repo, rama, path y política de sincronización).
+
+7. [repo-github/deployment.yaml](repo-github/deployment.yaml): **copia de referencia, no está en uso**. Ningún script de esta carpeta lo lee ni lo aplica; se guarda aquí solo como muestra para poder revisarlo sin salir del repositorio. El manifiesto real, el que Argo CD monitoriza y aplica en el clúster, vive en el repo de GitHub:
    - `https://github.com/mikelezc/mlezcano-iot-argocd`
 
-6. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
+8. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
    - `https://hub.docker.com/r/mikelezc/playground`
 
-7. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto). Incluye también [toolbox/reset.sh](toolbox/reset.sh), el script de limpieza del clúster.
+9. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto). Incluye también [toolbox/reset.sh](toolbox/reset.sh), el script de limpieza del clúster.
 
 ---
 
