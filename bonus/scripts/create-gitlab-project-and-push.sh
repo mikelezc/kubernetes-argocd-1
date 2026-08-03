@@ -93,13 +93,12 @@ push_to_gitlab() {
     trap 'rm -rf "$WORK_DIR"' EXIT
 
     cp "$MANIFEST_PATH" "$WORK_DIR/deployment.yaml"
-    cp "${BONUS_ROOT}/confs/gitlab-repo-readme.md" "$WORK_DIR/README.md"
 
     cd "$WORK_DIR"
     git init -q
     git config user.email "mlezcano@local"
     git config user.name "mlezcano"
-    git add deployment.yaml README.md
+    git add deployment.yaml
     git commit -q -m "Initial commit: deployment manifest for Argo CD"
     git branch -M main
 
@@ -127,7 +126,7 @@ echo "============================================================"
 echo "  Repositorio GitLab listo"
 echo "============================================================"
 echo ""
-echo "  URL:      http://localhost:8081/${PROJECT_FULL_PATH}"
+echo "  URL:      http://gitlab.localhost:8081/${PROJECT_FULL_PATH}"
 echo "  rama:     main"
 echo "  manifest: deployment.yaml  (imagen: mikelezc/playground:v1)"
 echo ""
