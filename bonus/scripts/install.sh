@@ -2,11 +2,62 @@
 
 set -e
 
-# Acceso a la carpeta /confs desde la VM
-if [ -d "/vagrant/confs" ]; then
-    CONFS_DIR="/vagrant/confs"
+# Este script asume que p3/ ya se ha levantado con "vagrant up",
+# solo añadimos GitLab encima, en el mismo clúster.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
+
+# Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
+# Antes de entrar, redimensionamos la VM (GitLab necesita bastante más RAM que p3 solo) — esto implica un "vagrant reload"
+if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
+    P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
+    if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
+        cd "$P3_ROOT"
+        # Comprobamos la RAM real de la VM antes de decidir si hace falta redimensionarla.
+        CURRENT_MEM_MB="$(vagrant ssh -c "free -m | awk '/Mem:/ {print \$2}'" 2>/dev/null | tr -d '\r' | tail -n1)"
+        if [ -z "$CURRENT_MEM_MB" ] || [ "$CURRENT_MEM_MB" -lt 6000 ]; then
+            echo "Redimensionando la VM de p3 para dar cabida a GitLab (P3_MEMORY=8192, P3_CPUS=3)..."
+            P3_MEMORY=8192 P3_CPUS=3 vagrant reload
+        else
+            echo "La VM de p3 ya tiene RAM suficiente (${CURRENT_MEM_MB}MB) — no hace falta redimensionar."
+        fi
+        BONUS_INSIDE_VM=1 vagrant ssh -c \
+            'cd /vagrant && BONUS_INSIDE_VM=1 bash /bonus/scripts/install.sh'
+        exit $?
+    fi
+    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/."
+    exit 1
+fi
+
+# El "vagrant reload" reinicia la VM entera, según la política de reinicio de
+# los contenedores, el clúster k3d puede no volver solo,
+# esperamos a que el nodo esté listo antes de aplicar nada.
+k3d cluster start iot-cluster >/dev/null 2>&1 || true
+
+export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+
+wait_for_node_ready() {
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+        if kubectl wait --for=condition=Ready node --all --timeout=15s >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 5
+    done
+    return 1
+}
+
+echo "Esperando a que el nodo esté listo..."
+if ! wait_for_node_ready; then
+    echo "[WARN] El nodo tarda más de lo normal en responder — se probará igualmente"
+fi
+
+# Acceso a bonus/confs desde dentro de la VM de p3 (montado en p3/Vagrantfile)
+if [ -d "/bonus/confs" ]; then
+    CONFS_DIR="/bonus/confs"
 else
-    CONFS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../confs" && pwd)"
+    CONFS_DIR="$BONUS_ROOT/confs"
 fi
 
 log_section() {
@@ -18,7 +69,6 @@ log_section() {
 
 log_ok()   { echo "[OK]   $1"; }
 log_warn() { echo "[WARN] $1"; }
-
 
 wait_for_minio_endpoint() {
     for _ in 1 2 3 4 5 6; do
@@ -32,50 +82,18 @@ wait_for_minio_endpoint() {
 }
 
 # -------------------------------------------------------
-log_section "1/5 — Herramientas base (Docker, kubectl, k3d, Helm)"
+log_section "1/3 — Herramientas (Helm)"
 # -------------------------------------------------------
 
-if ! command -v docker &>/dev/null; then
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker vagrant
-fi
-
-if ! command -v kubectl &>/dev/null; then
-    ARCH=$(dpkg --print-architecture)
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
-    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-fi
-
-if ! command -v k3d &>/dev/null; then
-    curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-fi
-
+# Docker/kubectl/k3d ya los instaló p3; aquí solo puede faltar Helm.
 if ! command -v helm &>/dev/null; then
     curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | sudo bash
 fi
 
-# -------------------------------------------------------
-log_section "2/5 — Cluster k3d iot-bonus"
-# -------------------------------------------------------
-
-k3d cluster delete iot-bonus 2>/dev/null || true
-k3d cluster create iot-bonus \
-    --api-port 6550 \
-    -p "80:80@loadbalancer" \
-    -p "443:443@loadbalancer" \
-    -p "8080:8080@loadbalancer" \
-    -p "8888:30080@server:0"
-
-mkdir -p /home/vagrant/.kube
-k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
-chown -R vagrant:vagrant /home/vagrant/.kube
-export KUBECONFIG=/home/vagrant/.kube/config
-
 kubectl apply -f "$CONFS_DIR/namespaces.yaml"
 
 # -------------------------------------------------------
-log_section "3/5 — GitLab (Helm chart 9.9.0)"
+log_section "2/3 — GitLab (Helm chart 9.9.0)"
 # -------------------------------------------------------
 
 helm repo add gitlab https://charts.gitlab.io/ && helm repo update
@@ -138,33 +156,7 @@ for attempt in 1 2 3; do
 done
 
 # -------------------------------------------------------
-log_section "4/5 — Argo CD (modo HTTP, sin Application)"
-# -------------------------------------------------------
-
-kubectl apply -n argocd \
-    -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.4/manifests/install.yaml
-
-echo "Esperando Argo CD server..."
-kubectl -n argocd wait --for=condition=ready pod \
-    -l app.kubernetes.io/name=argocd-server --timeout=300s >/dev/null
-
-echo "Ajustando reconciliación a 5s..."
-kubectl -n argocd patch configmap argocd-cm \
-    --type merge -p '{"data":{"timeout.reconciliation":"5s","timeout.reconciliation.jitter":"0s"}}' >/dev/null
-kubectl -n argocd rollout restart statefulset/argocd-application-controller >/dev/null
-kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=180s >/dev/null
-
-echo "Habilitando modo HTTP (insecure)..."
-kubectl -n argocd patch configmap argocd-cmd-params-cm \
-    --type merge -p '{"data":{"server.insecure":"true"}}' >/dev/null
-kubectl -n argocd rollout restart deployment argocd-server >/dev/null
-kubectl -n argocd rollout status deployment argocd-server --timeout=180s >/dev/null
-
-echo "Creando Ingress para Argo CD..."
-kubectl -n argocd apply -f "$CONFS_DIR/argocd-ingress.yaml" >/dev/null
-
-# -------------------------------------------------------
-log_section "5/5 — Contraseña inicial de GitLab"
+log_section "3/3 — Contraseña inicial de GitLab"
 # -------------------------------------------------------
 
 ROOT_SECRET="gitlab-gitlab-initial-root-password"
@@ -183,10 +175,10 @@ fi
 
 echo ""
 echo "============================================================"
-echo "=================== Instalación completada ================="
+echo "=================== GitLab instalado ======================"
 echo "============================================================"
 echo ""
-echo "GitLab:    http://gitlab.localhost:8081"
+echo "GitLab:    http://gitlab.localhost:8080"
 echo ""
 echo "  usuario:    root"
 if [ -n "$DECODED" ]; then
@@ -196,18 +188,7 @@ else
     echo "               -o jsonpath='{.data.password}' | base64 -d"
 fi
 echo ""
-ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
-    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
-
-echo "Argo CD:   http://localhost:8081  (sin Application aún)"
-echo ""
-echo "  usuario:    admin"
-if [ -n "$ARGOCD_PASSWORD" ]; then
-    echo "  contraseña: $ARGOCD_PASSWORD"
-else
-    echo "  contraseña: kubectl -n argocd get secret argocd-initial-admin-secret \\"
-    echo "               -o jsonpath='{.data.password}' | base64 -d"
-fi
+echo "Argo CD (:8080) y la app (:8888) ya estaban arriba gracias a p3."
 echo ""
 echo "Próximos pasos:"
 echo ""
