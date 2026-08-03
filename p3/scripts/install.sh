@@ -20,6 +20,10 @@ install_linux_tools() {
     curl -fsSL https://get.docker.com | sudo sh
   fi
 
+  if id vagrant >/dev/null 2>&1 && ! id -nG vagrant 2>/dev/null | grep -qw docker; then
+    usermod -aG docker vagrant
+  fi
+
   if ! command -v kubectl >/dev/null 2>&1; then
     arch="$(uname -m)"
     case "$arch" in
@@ -103,6 +107,13 @@ main() {
 
   log "Esperando nodos listos"
   kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null
+
+  if [ -d /home/vagrant ]; then
+    log "Exportando kubeconfig para el usuario vagrant"
+    mkdir -p /home/vagrant/.kube
+    k3d kubeconfig get "$CLUSTER_NAME" > /home/vagrant/.kube/config
+    chown -R vagrant:vagrant /home/vagrant/.kube
+  fi
 
   log "Ajustando CoreDNS para salida estable a Internet"
   patch_coredns
