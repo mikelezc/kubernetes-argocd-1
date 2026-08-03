@@ -1,13 +1,11 @@
 #!/bin/bash
-# Script para crear el proyecto en GitLab, generar un PAT y hacer push
-# del manifiesto inicial.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
-PAT_FILE="/tmp/.gitlab-pat"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
+BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"				# Directorio raíz del proyecto
+KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"				# Path por defecto del kubeconfig dentro de la VM
+PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh	
 
 # Re-ejecución automática dentro de la VM si se lanza desde el host
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
@@ -21,7 +19,7 @@ if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     exit 1
 fi
 
-export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
 GITLAB_VM_URL="http://gitlab.localhost"
 PROJECT_NAMESPACE="root"
@@ -32,6 +30,7 @@ GITLAB_PAT_NAME="mlezcano-argo"
 
 log() { echo "[$1] $2"; }
 
+# toolbox sirve para ejecutar comandos dentro del contenedor de GitLab, como crear proyectos y tokens
 get_toolbox_pod() {
     kubectl -n gitlab get pods -o name | grep '/gitlab-toolbox' | head -n 1 | cut -d/ -f2
 }
@@ -42,6 +41,7 @@ wait_for_gitlab_ui() {
         -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
 }
 
+# Asegura que el proyecto exista en GitLab
 ensure_project() {
     local toolbox_pod project_output project_repo_url
     toolbox_pod=$(get_toolbox_pod)
@@ -49,23 +49,7 @@ ensure_project() {
 
     log "2/4" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
     project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
-        gitlab-rails runner - <<'RUBY' 2>/dev/null || true
-user = User.find_by_username('root')
-project = Project.find_by_full_path('root/mlezcano-gitlab-demo')
-
-if project.nil?
-  project = Projects::CreateService.new(user, {
-    name:             'mlezcano-gitlab-demo',
-    path:             'mlezcano-gitlab-demo',
-    visibility_level: Gitlab::VisibilityLevel::PRIVATE
-  }).execute
-end
-
-abort(project.errors.full_messages.join(', ')) \
-  if project.respond_to?(:errors) && project.errors.any?
-puts project.http_url_to_repo
-RUBY
-)
+        gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-project.rb" 2>/dev/null || true)
 
     project_repo_url=$(printf '%s\n' "$project_output" | tail -n 1 | tr -d '\r')
     if [ -z "$project_repo_url" ] || [ "$project_repo_url" = "nil" ]; then
@@ -82,21 +66,7 @@ create_gitlab_pat() {
 
     log "3/4" "Creando Personal Access Token '${GITLAB_PAT_NAME}'..."
     pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
-        gitlab-rails runner - <<'RUBY' 2>/dev/null || true
-user = User.find_by_username('root')
-user.personal_access_tokens.where(name: 'mlezcano-argo').delete_all
-
-response = PersonalAccessTokens::CreateService.new(
-  current_user:    user,
-  target_user:     user,
-  organization_id: user.organization_id,
-  params: { name: 'mlezcano-argo', scopes: [:read_repository, :write_repository] }
-).execute
-
-abort(response.message) unless response.success?
-puts response.payload[:personal_access_token].token
-RUBY
-)
+        gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-pat.rb" 2>/dev/null || true)
 
     PAT_TOKEN=$(printf '%s\n' "$pat_output" | tail -n 1 | tr -d '\r')
     if [ -z "$PAT_TOKEN" ]; then
@@ -123,24 +93,12 @@ push_to_gitlab() {
     trap 'rm -rf "$WORK_DIR"' EXIT
 
     cp "$MANIFEST_PATH" "$WORK_DIR/deployment.yaml"
-    cat > "$WORK_DIR/README.md" <<'MD'
-# mlezcano-gitlab-demo
-
-Repositorio local en GitLab. Argo CD sincroniza desde aquí para desplegar
-la aplicación de ejemplo en el namespace `dev`.
-
-Para probar el flujo GitOps, edita `deployment.yaml` y cambia la imagen:
-- `mikelezc/playground:v1`
-- `mikelezc/playground:v2`
-
-Cada commit en la rama `main` dispara una sincronización automática en Argo CD.
-MD
 
     cd "$WORK_DIR"
     git init -q
     git config user.email "mlezcano@local"
     git config user.name "mlezcano"
-    git add deployment.yaml README.md
+    git add deployment.yaml
     git commit -q -m "Initial commit: deployment manifest for Argo CD"
     git branch -M main
 
@@ -168,7 +126,7 @@ echo "============================================================"
 echo "  Repositorio GitLab listo"
 echo "============================================================"
 echo ""
-echo "  URL:      http://localhost:8081/${PROJECT_FULL_PATH}"
+echo "  URL:      http://gitlab.localhost:8081/${PROJECT_FULL_PATH}"
 echo "  rama:     main"
 echo "  manifest: deployment.yaml  (imagen: mikelezc/playground:v1)"
 echo ""

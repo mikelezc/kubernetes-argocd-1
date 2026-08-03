@@ -1,8 +1,13 @@
 #!/bin/bash
-# Este script instala herramientas, crear cluster k3d iot-bonus,
-# desplegará GitLab (namespace gitlab) y Argo CD (namespace argocd).
 
 set -e
+
+# Acceso a la carpeta /confs desde la VM
+if [ -d "/vagrant/confs" ]; then
+    CONFS_DIR="/vagrant/confs"
+else
+    CONFS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../confs" && pwd)"
+fi
 
 log_section() {
     echo ""
@@ -13,6 +18,7 @@ log_section() {
 
 log_ok()   { echo "[OK]   $1"; }
 log_warn() { echo "[WARN] $1"; }
+
 
 wait_for_minio_endpoint() {
     for _ in 1 2 3 4 5 6; do
@@ -66,9 +72,7 @@ k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
 export KUBECONFIG=/home/vagrant/.kube/config
 
-kubectl create namespace gitlab --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace dev    --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "$CONFS_DIR/namespaces.yaml"
 
 # -------------------------------------------------------
 log_section "3/5 — GitLab (Helm chart 9.9.0)"
@@ -76,30 +80,31 @@ log_section "3/5 — GitLab (Helm chart 9.9.0)"
 
 helm repo add gitlab https://charts.gitlab.io/ && helm repo update
 
-if [ -f "/vagrant/confs/gitlab-values.yaml" ]; then
-    VALUES_PATH="/vagrant/confs/gitlab-values.yaml"
-else
-    VALUES_PATH="../confs/gitlab-values.yaml"
-fi
+VALUES_PATH="$CONFS_DIR/gitlab-values.yaml"
+
+MINIO_ARCH_ARGS=()
+case "$(uname -m)" in
+    aarch64|arm64)
+        MINIO_ARCH_ARGS=(
+            --set "minio.imageTag=RELEASE.2020-09-21T22-31-59Z-arm64"
+            --set "minio.minioMc.tag=RELEASE.2020-09-23T20-02-13Z-arm64"
+        )
+        MC_IMAGE="registry.gitlab.com/gitlab-org/cloud-native/mirror/images/minio/mc:RELEASE.2020-09-23T20-02-13Z-arm64"
+        ;;
+    *)
+        MC_IMAGE="minio/mc:RELEASE.2018-07-13T00-53-22Z"
+        ;;
+esac
 
 if ! helm upgrade --install gitlab gitlab/gitlab \
     --version 9.9.0 \
     --timeout 600s \
     --namespace gitlab \
-    -f "$VALUES_PATH"; then
+    -f "$VALUES_PATH" \
+    "${MINIO_ARCH_ARGS[@]}"; then
     echo "Error: GitLab no se pudo instalar con Helm."
     exit 1
 fi
-
-echo "Parcheando Ingress de GitLab a clase traefik..."
-for INGRESS in gitlab-webservice-default gitlab-kas gitlab-minio; do
-    if kubectl -n gitlab patch ingress "$INGRESS" \
-        --type=merge -p '{"spec":{"ingressClassName":"traefik"}}' 2>/dev/null; then
-        log_ok "$INGRESS parcheado"
-    else
-        log_ok "$INGRESS ya estaba parcheado"
-    fi
-done
 
 echo "Esperando pod MinIO..."
 kubectl -n gitlab wait --for=condition=ready pod \
@@ -112,6 +117,8 @@ else
     log_warn "MinIO aún no expone el endpoint — se probará igualmente"
 fi
 
+kubectl -n gitlab delete job -l app=minio,release=gitlab --ignore-not-found >/dev/null 2>&1
+
 echo "Inicializando buckets MinIO..."
 ACCESS_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
     -o jsonpath="{.data.accesskey}" | base64 -d 2>/dev/null || echo "minioadmin")
@@ -120,18 +127,10 @@ SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
 
 for attempt in 1 2 3; do
     if kubectl -n gitlab run mc-init --rm -i --restart=Never \
-        --image=minio/mc:latest \
-        --command -- /bin/sh -c "
-            mc alias set myminio http://gitlab-minio-svc.gitlab.svc:9000 \
-                '$ACCESS_KEY' '$SECRET_KEY' >/dev/null 2>&1
-            for b in registry git-lfs runner-cache gitlab-uploads gitlab-artifacts \
-                      gitlab-backups gitlab-packages tmp gitlab-mr-diffs \
-                      gitlab-terraform-state gitlab-ci-secure-files \
-                      gitlab-dependency-proxy gitlab-pages; do
-                mc mb myminio/\$b >/dev/null 2>&1 || true
-                mc policy none myminio/\$b >/dev/null 2>&1 || true
-            done
-        " >/dev/null 2>&1; then
+        --image="$MC_IMAGE" \
+        --env="ACCESS_KEY=$ACCESS_KEY" \
+        --env="SECRET_KEY=$SECRET_KEY" \
+        --command -- /bin/sh < "$CONFS_DIR/minio-init-buckets.sh" >/dev/null 2>&1; then
         break
     fi
     [ "$attempt" -lt 3 ] && { log_warn "MinIO aún arrancando, reintentando..."; sleep 3; continue; }
@@ -162,26 +161,7 @@ kubectl -n argocd rollout restart deployment argocd-server >/dev/null
 kubectl -n argocd rollout status deployment argocd-server --timeout=180s >/dev/null
 
 echo "Creando Ingress para Argo CD..."
-kubectl -n argocd apply -f - >/dev/null <<'EOF'
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-server
-  namespace: argocd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: localhost
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            port:
-              number: 80
-EOF
+kubectl -n argocd apply -f "$CONFS_DIR/argocd-ingress.yaml" >/dev/null
 
 # -------------------------------------------------------
 log_section "5/5 — Contraseña inicial de GitLab"
@@ -189,7 +169,7 @@ log_section "5/5 — Contraseña inicial de GitLab"
 
 ROOT_SECRET="gitlab-gitlab-initial-root-password"
 echo "Esperando secret con contraseña root de GitLab..."
-for i in $(seq 1 24); do
+for _ in $(seq 1 24); do
     kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1 && break
     sleep 5
 done

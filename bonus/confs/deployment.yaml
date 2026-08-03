@@ -1,3 +1,4 @@
+# Manifiesto que despliega la aplicación de ejemplo en el cluster k3d+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,11 +20,11 @@ spec:
     spec:
       containers:
       - name: mlezcano-playground
-        image: mikelezc/playground:v1
+        image: mikelezc/playground:v1 # Para cambiar la versión ponemos este número en 1 o en 2
         imagePullPolicy: IfNotPresent
         env:
         - name: VERSION
-          value: "v1" # esta es la variable que cambiaremos para la demostración de la actualización de la aplicación (v1 ó v2)
+          value: "v1" # Para cambiar la versión ponemos este número en 1 o en 2
         ports:
         - containerPort: 8888
 ---
