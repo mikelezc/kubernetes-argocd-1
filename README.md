@@ -19,12 +19,16 @@ Cada carpeta tiene su propio README con los detalles de arranque, verificación 
 
 Este proyecto se desarrolló mitad en Mac con Apple Silicon (ARM64) y la otra mitad en una máquina con Linux y arquitectura AMD64 (x86_64). Todos los módulos están preparados para funcionar en ambas arquitecturas:
 
-- **p1 / p2**: el Vagrantfile detecta la arquitectura y elige el proveedor correcto
-  (VMware Desktop en ARM, VirtualBox en AMD64). La box usada (`bento/ubuntu-22.04`) tiene imagen
-  para ambas arquitecturas.
-- **p3**: `scripts/install.sh` detecta `uname -m` y descarga el binario correcto de kubectl.
-  K3d y Docker son compatibles con ambas arquitecturas de forma nativa.
-- **bonus**: mismo comportamiento que p3. El Vagrantfile del bonus también detecta la arquitectura.
+- **p1 / p2 / p3**: el Vagrantfile detecta la arquitectura y elige el proveedor correcto
+  (VMware Desktop en ARM, VirtualBox en AMD64). La box usada (`bento/ubuntu-26.04`) tiene imagen
+  para ambas arquitecturas. `p3/scripts/install.sh` además detecta `uname -m` para descargar el
+  binario correcto de kubectl (tanto si corre dentro de esa VM como en el camino sin VM de
+  `p3/toolbox/`); K3d y Docker son compatibles con ambas arquitecturas de forma nativa.
+
+- **bonus**: instala GitLab dentro del mismo clúster/VM que
+  levanta `p3/`, y hereda de ahí la detección de arquitectura. Solo añade su propia detección
+  para los tags de imagen de MinIO (ver `bonus/scripts/install.sh`).
+
 - **Docker Hub**: la imagen de docker usada en el proyecto `mikelezc/playground` fué desarrollada y se publicó como manifiesto multi-arquitectura
   con soporte para `linux/amd64` y `linux/arm64`. En el subject proyecto se hablaba de la posibilidad de usar una que nos daban ya hecha, pero había incompatibilidades con ARM y se optó por desarrollarla de esta manera finalmente.
 
