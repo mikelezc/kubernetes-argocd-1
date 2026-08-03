@@ -6,7 +6,7 @@ global:
     domain: localhost
     https: false
   ingress:
-    class: traefik               # si no, cada "helm upgrade" vuelve a dejar los Ingress sin clase y GitLab deja de responder
+    class: traefik              # si no, cada "helm upgrade" vuelve a dejar los Ingress sin clase y GitLab deja de responder
 installCertmanager: false
 certmanager-issuer:
   email: admin@gitlab.local     # aunque no lo usaremos porque no habilitamos HTTPS, evita un error de TLS al instalar cert-manager

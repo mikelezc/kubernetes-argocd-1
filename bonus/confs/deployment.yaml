@@ -1,3 +1,4 @@
+# Manifiesto que despliega la aplicación de ejemplo en el cluster k3d+
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -2,6 +2,13 @@
 
 set -e
 
+# Acceso a la carpeta /confs desde la VM
+if [ -d "/vagrant/confs" ]; then
+    CONFS_DIR="/vagrant/confs"
+else
+    CONFS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../confs" && pwd)"
+fi
+
 log_section() {
     echo ""
     echo "========================================================="
@@ -11,6 +18,7 @@ log_section() {
 
 log_ok()   { echo "[OK]   $1"; }
 log_warn() { echo "[WARN] $1"; }
+
 
 wait_for_minio_endpoint() {
     for _ in 1 2 3 4 5 6; do
@@ -64,9 +72,7 @@ k3d kubeconfig get iot-bonus > /home/vagrant/.kube/config
 chown -R vagrant:vagrant /home/vagrant/.kube
 export KUBECONFIG=/home/vagrant/.kube/config
 
-kubectl create namespace gitlab --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace dev    --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f "$CONFS_DIR/namespaces.yaml"
 
 # -------------------------------------------------------
 log_section "3/5 — GitLab (Helm chart 9.9.0)"
@@ -74,11 +80,7 @@ log_section "3/5 — GitLab (Helm chart 9.9.0)"
 
 helm repo add gitlab https://charts.gitlab.io/ && helm repo update
 
-if [ -f "/vagrant/confs/gitlab-values.yaml" ]; then
-    VALUES_PATH="/vagrant/confs/gitlab-values.yaml"
-else
-    VALUES_PATH="../confs/gitlab-values.yaml"
-fi
+VALUES_PATH="$CONFS_DIR/gitlab-values.yaml"
 
 MINIO_ARCH_ARGS=()
 case "$(uname -m)" in
@@ -126,19 +128,9 @@ SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
 for attempt in 1 2 3; do
     if kubectl -n gitlab run mc-init --rm -i --restart=Never \
         --image="$MC_IMAGE" \
-        --command -- /bin/sh -c "
-            mc alias set myminio http://gitlab-minio-svc.gitlab.svc:9000 \
-                '$ACCESS_KEY' '$SECRET_KEY' >/dev/null 2>&1
-            for b in registry git-lfs runner-cache gitlab-uploads gitlab-artifacts \
-                      gitlab-backups gitlab-packages tmp gitlab-mr-diffs \
-                      gitlab-terraform-state gitlab-ci-secure-files \
-                      gitlab-dependency-proxy gitlab-pages; do
-                mc mb myminio/\$b >/dev/null 2>&1 || true
-                # La sintaxis de 'mc policy' cambió entre versiones (antigua: sin 'set',
-                # moderna: con 'set'); probamos las dos, cualquiera de las dos que valga.
-                mc policy set none myminio/\$b >/dev/null 2>&1 || mc policy none myminio/\$b >/dev/null 2>&1 || true
-            done
-        " >/dev/null 2>&1; then
+        --env="ACCESS_KEY=$ACCESS_KEY" \
+        --env="SECRET_KEY=$SECRET_KEY" \
+        --command -- /bin/sh < "$CONFS_DIR/minio-init-buckets.sh" >/dev/null 2>&1; then
         break
     fi
     [ "$attempt" -lt 3 ] && { log_warn "MinIO aún arrancando, reintentando..."; sleep 3; continue; }
@@ -169,26 +161,7 @@ kubectl -n argocd rollout restart deployment argocd-server >/dev/null
 kubectl -n argocd rollout status deployment argocd-server --timeout=180s >/dev/null
 
 echo "Creando Ingress para Argo CD..."
-kubectl -n argocd apply -f - >/dev/null <<'EOF'
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-server
-  namespace: argocd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: localhost
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            port:
-              number: 80
-EOF
+kubectl -n argocd apply -f "$CONFS_DIR/argocd-ingress.yaml" >/dev/null
 
 # -------------------------------------------------------
 log_section "5/5 — Contraseña inicial de GitLab"

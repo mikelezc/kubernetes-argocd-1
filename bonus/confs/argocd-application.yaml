@@ -1,0 +1,20 @@
+# Manifiesto que hace que Argo CD tome el repo de GitLab local que
+# create-gitlab-project-and-push.sh crea, y lo despliegue en nuestro cluster
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iot-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://gitlab-webservice-default.gitlab.svc:8181/root/mlezcano-gitlab-demo.git
+    targetRevision: main
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

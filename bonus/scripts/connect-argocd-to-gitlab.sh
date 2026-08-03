@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
-PAT_FILE="/tmp/.gitlab-pat"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
+BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)" 				# Directorio raíz del proyecto
+KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"				# Path por defecto del kubeconfig dentro de la VM
+PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh
 
 # Re-ejecución automática dentro de la VM si se lanza desde el host
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
@@ -19,7 +19,7 @@ if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     exit 1
 fi
 
-export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
 GITLAB_CLUSTER_BASE_URL="http://gitlab-webservice-default.gitlab.svc:8181"
 PROJECT_FULL_PATH="root/mlezcano-gitlab-demo"
@@ -53,26 +53,7 @@ configure_argocd_repo() {
 
 configure_argocd_application() {
     log "2/3" "Creando Application 'iot-app' apuntando a GitLab local..."
-    kubectl -n argocd apply -f - >/dev/null <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: iot-app
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: ${ARGO_REPO_URL}
-    targetRevision: main
-    path: .
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: dev
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
+    kubectl -n argocd apply -f "${BONUS_ROOT}/confs/argocd-application.yaml" >/dev/null
 }
 
 refresh_argocd() {

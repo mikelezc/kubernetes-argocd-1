@@ -1,0 +1,16 @@
+# Los tres namespaces del laboratorio del bonus: gitlab (requerido por el
+# subject), argocd (el controlador GitOps) y dev (la app desplegada).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitlab
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev

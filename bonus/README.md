@@ -64,11 +64,23 @@ GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado re
 3. [confs/deployment.yaml](confs/deployment.yaml): manifiesto inicial de la app. Se usa **una sola vez**, para sembrar el repositorio en GitLab (`create-gitlab-project-and-push.sh` lo sube en el primer push). 
 A partir de ahí, la versión que Argo CD vigila de verdad vive dentro de GitLab, y los cambios se hacen en su UI, no en este fichero.
 
-4. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala Docker/kubectl/k3d/Helm en la VM, crea el clúster, despliega GitLab y Argo CD.
+4. [confs/argocd-application.yaml](confs/argocd-application.yaml): manifiesto estático de la `Application` de Argo CD (repo de GitLab local, rama, path y política de sincronización). Lo aplica `connect-argocd-to-gitlab.sh`.
 
-5. [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea el proyecto en GitLab vía su API y sube `confs/deployment.yaml`.
+5. [confs/gitlab-create-project.rb](confs/gitlab-create-project.rb) y [confs/gitlab-create-pat.rb](confs/gitlab-create-pat.rb): scripts de Ruby que `create-gitlab-project-and-push.sh` ejecuta dentro del pod `toolbox` de GitLab (vía `gitlab-rails runner`) para crear el proyecto inicial y su token de acceso, sin depender de credenciales previas.
 
-6. [scripts/connect-argocd-to-gitlab.sh](scripts/connect-argocd-to-gitlab.sh): registra el repositorio de GitLab en Argo CD y crea la `Application`.
+6. [confs/gitlab-repo-readme.md](confs/gitlab-repo-readme.md): `README.md` que se sube junto al manifiesto al crear el repositorio en GitLab.
+
+7. [confs/namespaces.yaml](confs/namespaces.yaml): los tres namespaces del laboratorio (`gitlab`, `argocd`, `dev`).
+
+8. [confs/argocd-ingress.yaml](confs/argocd-ingress.yaml): Ingress que expone Argo CD por HTTP a través de Traefik.
+
+9. [confs/minio-init-buckets.sh](confs/minio-init-buckets.sh): script que crea los buckets que necesita GitLab en MinIO. `install.sh` lo ejecuta dentro de un pod `mc` de usar y tirar, pasándole las credenciales como variables de entorno (no interpoladas en el propio script).
+
+10. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala Docker/kubectl/k3d/Helm en la VM, crea el clúster, despliega GitLab y Argo CD.
+
+11. [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea el proyecto en GitLab vía su API y sube `confs/deployment.yaml`.
+
+12. [scripts/connect-argocd-to-gitlab.sh](scripts/connect-argocd-to-gitlab.sh): registra el repositorio de GitLab en Argo CD y crea la `Application`.
 
 ---
 
