@@ -7,15 +7,16 @@ BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)" 				# Directorio raíz del proyecto
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"				# Path por defecto del kubeconfig dentro de la VM
 PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh
 
-# Re-ejecución automática dentro de la VM si se lanza desde el host
+# Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
-    if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
-        cd "$BONUS_ROOT"
+    P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
+    if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
+        cd "$P3_ROOT"
         BONUS_INSIDE_VM=1 vagrant ssh -c \
-            'cd /vagrant && BONUS_INSIDE_VM=1 bash /vagrant/scripts/connect-argocd-to-gitlab.sh'
+            'cd /vagrant && BONUS_INSIDE_VM=1 bash /bonus/scripts/connect-argocd-to-gitlab.sh'
         exit $?
     fi
-    echo "No encuentro el kubeconfig. Ejecuta primero 'vagrant up'."
+    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/ y luego ./scripts/install.sh desde bonus/."
     exit 1
 fi
 
@@ -52,7 +53,9 @@ configure_argocd_repo() {
 }
 
 configure_argocd_application() {
-    log "2/3" "Creando Application 'iot-app' apuntando a GitLab local..."
+    # La Application "iot-app" fué creada en p3.
+    # Este apply parchea en sitio su spec.source.repoURL para que apunte al repo local de GitLab
+    log "2/3" "Re-apuntando la Application 'iot-app' a GitLab local..."
     kubectl -n argocd apply -f "${BONUS_ROOT}/confs/argocd-application.yaml" >/dev/null
 }
 
@@ -75,19 +78,22 @@ ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret \
 
 echo ""
 echo "============================================================"
-echo "  Argo CD conectado a GitLab local"
+echo "  Argo CD re-apuntado a GitLab local"
 echo "============================================================"
 echo ""
-echo "Argo CD:    http://localhost:8081"
+echo "Argo CD:    http://localhost:8080"
 echo "  usuario:    admin"
 echo "  contraseña: ${ARGOCD_PASSWORD}"
 echo ""
-echo "Repositorio: http://gitlab.localhost:8081/root/mlezcano-gitlab-demo"
-echo "Aplicación:  http://localhost:8889"
+echo "Repositorio: http://gitlab.localhost:8080/root/mlezcano-gitlab-demo"
+echo "Aplicación:  http://localhost:8888"
 echo ""
 echo "Para demostrar el flujo GitOps:"
 echo "  1. Abre GitLab → root/mlezcano-gitlab-demo → deployment.yaml"
 echo "  2. Cambia la imagen:  mikelezc/playground:v1  →  mikelezc/playground:v2"
 echo "  3. Haz commit en main → Argo CD sincroniza automáticamente"
-echo "  4. Verifica: curl http://localhost:8889/"
+echo "  4. Verifica: curl http://localhost:8888/"
+echo ""
+echo "Para volver a GitHub en cualquier momento:"
+echo "  ./scripts/revert-to-github.sh"
 echo ""
