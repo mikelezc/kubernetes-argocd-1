@@ -47,6 +47,30 @@ install_linux_tools() {
   if ! command -v k3d >/dev/null 2>&1; then
     curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
   fi
+
+  configure_docker_dns
+}
+
+# Función para configurar DNS en Docker para Linux, asegurando que los contenedores puedan resolver nombres externos.
+configure_docker_dns() {
+  local daemon_json="/etc/docker/daemon.json"
+  if [ -f "$daemon_json" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$daemon_json" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        config = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    config = {}
+config["dns"] = ["8.8.8.8", "1.1.1.1"]
+with open(path, "w") as f:
+    json.dump(config, f, indent=2)
+PY
+  else
+    printf '{\n  "dns": ["8.8.8.8", "1.1.1.1"]\n}\n' > "$daemon_json"
+  fi
+  systemctl restart docker
 }
 
 # Función para instalar herramientas necesarias en macOS (Homebrew, kubectl, k3d)
@@ -85,6 +109,22 @@ patch_coredns() {
     kubectl apply -f - >/dev/null
   kubectl rollout restart deployment/coredns -n kube-system >/dev/null
   kubectl rollout status deployment/coredns -n kube-system --timeout=120s >/dev/null
+}
+
+# Comprobamos que el DNS externo resuelve justo antes del momento crítico (cuando Argo CD
+# va a intentar el primer git fetch), y reaplicamos el parche si hiciera falta.
+wait_for_dns() {
+  for attempt in 1 2 3 4 5 6; do
+    if kubectl run "dns-check-${attempt}" --rm -i --restart=Never \
+        --image=busybox:1.36 --timeout=20s \
+        --command -- nslookup github.com >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "DNS externo aún no responde, reaplicando el parche de CoreDNS (intento $attempt/6)..."
+    patch_coredns
+    sleep 3
+  done
+  return 1
 }
 
 wait_for_argocd() {
@@ -145,6 +185,11 @@ main() {
   kubectl rollout restart deployment/argocd-server -n argocd >/dev/null
   kubectl rollout status deployment/argocd-server -n argocd --timeout=180s >/dev/null
   kubectl apply -n argocd -f "$REPO_ROOT/confs/argocd-ingress.yaml" >/dev/null
+
+  log "Verificando resolución DNS externa antes de aplicar la Application"
+  if ! wait_for_dns; then
+    echo "[WARN] El DNS externo sigue sin responder tras varios intentos; Argo CD podría fallar al sincronizar" >&2
+  fi
 
   log "Aplicando la Application de Argo CD"
   kubectl apply -f "$REPO_ROOT/confs/argocd.yaml" >/dev/null
