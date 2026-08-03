@@ -2,7 +2,7 @@
 
 En la Parte 2 provisionamos con Vagrant una única VM y desplegábamos las aplicaciones contra un `Ingress` fijo. En esta Parte 3 el enunciado pide usar **K3d para levantar el clúster**, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
 
-La directriz general del proyecto ("todo el proyecto tiene que hacerse en una VM") sigue aplicando y es por eso que utilizamos vagrant pero la diferencia es que la usaremos para levantar la VM que debe de hacer de wrapper del cluster levantado en contenedores por k3s. Esto es además necesario si además queremos encadenar el bonus, que extiende esa misma VM con GitLab.
+Aquí Vagrant cambia de papel: ya no instala K3s directamente como en las Partes 1 y 2, solo nos da la VM dentro de la cual Docker levanta el clúster K3d. Esto es lo que permite encadenar el bonus más adelante, que extiende esa misma VM añadiendo GitLab.
 
 El flujo completo quedaría de la siguiente manera:
 
@@ -62,7 +62,7 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 ## Contenido de la carpeta
 
-1. [Vagrantfile](Vagrantfile): Define la VM sobre la que vamos a aprovisionar k3d y anidar los contenedores(`P3_MEMORY`/`P3_CPUS` para el tamaño, 2048MB/2CPU por defecto) y monta también `../bonus` en `/bonus`, para que el bonus pueda extender esta misma VM más adelante.
+1. [Vagrantfile](Vagrantfile): define la VM sobre la que corre K3d (`P3_MEMORY`/`P3_CPUS` para el tamaño, 2048MB/2CPU por defecto) y monta también `../bonus` en `/bonus`, para que el bonus pueda extender esta misma VM más adelante.
 
 3. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
 
@@ -80,7 +80,7 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 ## Requisitos previos
 
-1. Docker Desktop (o daemon Docker) activo si decidimos levantar el cluster usando `/toolbox`(diréctamente sobre el host).
+1. Docker Desktop (o daemon Docker) activo si decidimos levantar el clúster directamente sobre el host (con o sin `toolbox/`).
 
 2. Acceso a GitHub y a un repositorio público con el login de un miembro del equipo en el nombre.
    - `https://github.com/mikelezc/mlezcano-iot-argocd`
@@ -94,7 +94,7 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 ---
 
-## Arranque de infraestructura (método usado en desarrollo)
+## Arranque de infraestructura
 
 Desde `p3/`, con privilegios de root:
 
@@ -106,7 +106,7 @@ El script detecta el sistema operativo (`Darwin`/`Linux`), instala Docker/`kubec
 
 ---
 
-### Alternativa sin privilegios de host (método usado en desarrollo)
+### Alternativa sin privilegios de host
 
 Si no hay privilegios para instalar `kubectl`/`k3d` en el sistema, podemos usar el toolbox en `toolbox/`: una imagen Docker con ambos ya instalados, que se ejecuta montando el socket de Docker del host (`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. El clúster K3d se crea igual como contenedores del Docker del host (no anidados), y los puertos publicados (8080, 8888) quedan accesibles en el `localhost` real de la máquina, exactamente igual que con la instalación directa.
 
@@ -123,13 +123,11 @@ También sirve para lanzar comandos sueltos con las herramientas ya listas:
 ./toolbox/run.sh   # shell interactiva con kubectl/k3d/docker(cliente)/git/jq
 ```
 
-**Sin embargo este toolbox ha quedado como vestigio del proceso de desarrollo, ya que la alternativa para anidarlo dentro de la VM y poder desplegar el bonus encima lo haremos mediante el método que veremos a continuación.**
-
 ---
 
 ### Alternativa con Vagrant (necesaria para encadenar el bonus)
 
-Los dos caminos anteriores no usan ninguna VM — el clúster corre directamente sobre el Docker del host. Si además queremos levantar el bonus (que añade GitLab a este mismo laboratorio, tal y como pide el subject), usaremos este tercer camino p3 para meterlo dentro de su propia VM.
+Los dos caminos anteriores no usan ninguna VM — el clúster corre directamente sobre el Docker del host. Si además queremos levantar el bonus (que añade GitLab a este mismo laboratorio, tal y como pide el subject), usamos este tercer camino: levantar p3 dentro de su propia VM.
 
 ```bash
 vagrant up
@@ -192,7 +190,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-3. **Verificamos que Argo CD está funcionando y desplegando lo correcto** P
+3. **Verificamos que Argo CD está funcionando y desplegando lo correcto**
 
 ### Primero por `kubectl` (es decir, por terminal):
 
