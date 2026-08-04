@@ -1,43 +1,43 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
+  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4)
   # ==========================================
-  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
-    config.vm.box = "bento/ubuntu-26.04"
-    provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
-  else
-    config.vm.box = "bento/ubuntu-26.04"
-    provider = "virtualbox"
-  end
+  BOX				= "bento/ubuntu-26.04"
+  SERVER_VM_NAME	= "mlezcanoS"
+  SERVER_IP			= "192.168.56.110"
+
+  # Determinamos la arquitectura del sistema donde se ejecuta:
+  is_mac_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ ||
+               (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+  # Vagrant en Mac M-Series usará Parallels o VMware; en Intel/Linux, VirtualBox
+  provider = is_mac_arm ? (ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop") : "virtualbox"
+
+  config.vm.box = BOX
 
   # ==========================================
   # CONFIGURACIÓN GLOBAL (Especificaciones de CPU y RAM)
   # ==========================================
   config.vm.provider provider do |v|
-    if provider == "virtualbox" || provider == "parallels"
-      v.memory = 512
-      v.cpus = 1
-    elsif provider == "vmware_desktop"
+    if provider == "vmware_desktop"
       v.vmx["memsize"] = "512"
       v.vmx["numvcpus"] = "1"
+    else
+      v.memory = 512
+      v.cpus = 1
     end
   end
 
   # ==========================================
   # MÁQUINA ÚNICA: Server de K3s (mlezcanoS)
   # ==========================================
-  config.vm.define "mlezcanoS" do |server|
-    server.vm.hostname = "mlezcanoS"
-    server.vm.network "private_network", ip: "192.168.56.110"
-    
+  config.vm.define SERVER_VM_NAME do |server|
+    server.vm.hostname = SERVER_VM_NAME
+    server.vm.network "private_network", ip: SERVER_IP
+
     server.vm.provider provider do |v|
-      if provider == "virtualbox" || provider == "parallels"
-        v.name = "mlezcanoS_p2"
-      elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "mlezcanoS_p2"
-      end
+      provider == "vmware_desktop" ? v.vmx["displayname"] = "#{SERVER_VM_NAME}_p2" : v.name = "#{SERVER_VM_NAME}_p2"
     end
-    
-    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+
+    server.vm.provision "shell", path: "scripts/server.sh", args: SERVER_IP
   end
 end
