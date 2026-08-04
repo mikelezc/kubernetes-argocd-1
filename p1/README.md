@@ -6,7 +6,7 @@ Dado que Kubernetes estándar consume muchísimos recursos para ser montado de c
 
 **K3s** es una distribución certificada de Kubernetes creada por *[Rancher](https://www.rancher.com)*, diseñada para ser extremadamente ligera (ocupa menos de 100MB). 
 
-Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje como en nuestro caso.
+Es ideal para despliegues IoT (Internet of Things) y aprendizaje como en nuestro caso.
 
 ---
 
@@ -14,7 +14,7 @@ Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje
 
 - **Server (Control-Plane)**: Es el nodo principal del clúster. Expone la API de Kubernetes para interactuar con el sistema y mantiene el estado general del clúster (utilizando SQLite en K3s en lugar de etcd).
 
-- **Worker (Agent)**: En un cluster de Kubernetes, son los nodos de trabajo encargados de ejecutar las cargas de trabajo (en este proyecto implementaremos un solo nodo). No toma decisiones administrativas: obedece al Server, ejecuta los Pods (contenedores) asignados y les proporciona conectividad dentro de la red interna del clúster.
+- **Worker (Agent)**: En un cluster de Kubernetes, son los nodos de trabajo encargados de ejecutar las cargas de trabajo (en este proyecto implementaremos un solo nodo worker). No toma decisiones administrativas: obedece al Server, ejecuta los Pods (contenedores) asignados y les proporciona conectividad dentro de la red interna del clúster.
 
 ---
 
@@ -24,7 +24,7 @@ Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje
 
 - **Máquina 2 (Worker)**: Hostname `mlezcanoSW`, IP: `192.168.56.111`.
 
-- SSH configurado en ambas máquinas sin password.
+- SSH configurado en ambas máquinas sin password (es como viene por defecto).
 
 - K3s en modo *controller* en el Server, K3s en modo *agent* en el Worker.
 
@@ -65,6 +65,10 @@ Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje
   - Entramos en el Server, porque ahí vive el control-plane. `vagrant ssh mlezcanoS`
   - Ejecutamos `kubectl cluster-info`.
   - Podemos ver que el control plane, CoreDNS y metrics-server están accesibles desde la API de K3s.
+  
+  **NOTA** Si abrimos en el navegador la URL que devuelve `kubectl cluster-info`, (ej: `https://192.168.56.110:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy`), es normal que salga `Unauthorized`.
+  
+  Esa URL es un endpoint de la API de Kubernetes, no una página web pública. El navegador no lleva las credenciales/certificados de `kubectl`, así que la respuesta 401 significa que el clúster está protegiendo correctamente el acceso.
 
 ---
 
@@ -76,38 +80,60 @@ Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje
 
 ---
 
-6. **Verificamos que los pods del sistema están arriba**
+6. **Verificamos los pods del sistema según su namespace**
+
+	- 6.1 Si queremos ver los namespaces de nuestro cluster bastará con escribir `kubectl get ns`
+
+	Veremos esta salida:
+		```bash
+			vagrant@mlezcanoS:~$ kubectl get ns
+				NAME              STATUS   AGE
+				default           Active   2m9s
+				kube-node-lease   Active   2m9s
+				kube-public       Active   2m9s
+				kube-system       Active   2m9s
+		```
   
-  - Ejecuta `kubectl get pods -n kube-system`.
-  - Podremos ver pods como CoreDNS, metrics-server, flannel o los componentes que use tu instalación de K3s.
+	- 6.2 Podemos revisar los pods dentro de cada namespace de la siguiente manera:
 
-***Explicación de los Pods del clúster (Componentes del sistema):***
+		- Ejemplo: `kubectl get pods -n kube-system` (aquí veremos los pods del propio sistema).
+			*Al tratarse de un cluster "limpio" sin nada desplegado aún, este el el único namespace que contiene pods.*
 
-- **`coredns-...`**: Servidor DNS interno del clúster. Permite que los Pods se comuniquen entre sí usando nombres de dominio internos (ej. `mi-servicio.default.svc.cluster.local`) en lugar de IPs efímeras.
+		- Podremos ver pods como CoreDNS, metrics-server, flannel o los componentes de la instalación de K3s.
 
-- **`helm-install-traefik-...` y `helm-install-traefik-crd-...`**: Trabajos temporales (*Jobs*) que K3s ejecuta al arrancar para desplegar Traefik y sus definiciones de recursos personalizados (CRDs). El estado `Completed` indica que la instalación terminó con éxito y ya no consumen recursos.
+	- 6.3 Explicación de los Pods del clúster (Componentes del sistema):***
+		
+		- **`coredns-...`**: Servidor DNS interno del clúster. Permite que los Pods se comuniquen entre sí usando nombres de dominio internos (ej. `mi-servicio.default.svc.cluster.local`) en lugar de IPs efímeras.
+		
+		- **`helm-install-traefik-...` y `helm-install-traefik-crd-...`**: Trabajos temporales (*Jobs*) que K3s ejecuta al arrancar para desplegar Traefik y sus definiciones de recursos personalizados (CRDs). El estado `Completed` indica que la instalación terminó con éxito y ya no consumen recursos.
+		
+		- **`local-path-provisioner-...`**: Controlador de almacenamiento (*StorageClass* por defecto). Permite a los Pods solicitar almacenamiento persistente (`PersistentVolume`) reservando y gestionando directorios en el propio disco de la VM.
+		
+		- **`metrics-server-...`**: Recolector de métricas en tiempo real. Mide el consumo de CPU y memoria de los nodos y Pods; es el componente que alimenta comandos como `kubectl top`.
+		
+		- **`svclb-traefik-...` (Klipper Load Balancer)**: Balanceador de carga liviano integrado en K3s (*Service LB*). Mapea los puertos físicos de la VM (80/443) hacia el Ingress Controller.
+		
+		- **`traefik-...`**: El *Ingress Controller* por defecto del clúster. Actúa como proxy inverso y punto de entrada unificado para enrutar el tráfico HTTP/HTTPS externo hacia los Servicios adecuados según las reglas definidas.
 
-- **`local-path-provisioner-...`**: Controlador de almacenamiento (*StorageClass* por defecto). Permite a los Pods solicitar almacenamiento persistente (`PersistentVolume`) reservando y gestionando directorios en el propio disco de la VM.
+	- 6.4 Si un pod no arranca bien (o simplemente queremos ver qué está haciendo), podemos inspeccionar sus logs con `kubectl logs <pod> -n <namespace>`.
 
-- **`metrics-server-...`**: Recolector de métricas en tiempo real. Mide el consumo de CPU y memoria de los nodos y Pods; es el componente que alimenta comandos como `kubectl top`.
+		- Ejemplo, para ver los logs de CoreDNS (usamos el label en vez del nombre exacto del pod, que cambia en cada despliegue):
+			```bash
+				kubectl logs -n kube-system -l k8s-app=kube-dns
+			```
 
-- **`svclb-traefik-...` (Klipper Load Balancer)**: Balanceador de carga liviano integrado en K3s (*Service LB*). Mapea los puertos físicos de la VM (80/443) hacia el Ingress Controller.
-
-- **`traefik-...`**: El *Ingress Controller* por defecto del clúster. Actúa como proxy inverso y punto de entrada unificado para enrutar el tráfico HTTP/HTTPS externo hacia los Servicios adecuados según las reglas definidas.
+		- Con `-f` (`--follow`) seguimos el log en tiempo real, útil mientras un pod está arrancando.
+		- Con `--previous` vemos los logs del contenedor anterior, si el pod se reinició (por ejemplo tras una caida).
+		- Si el pod tiene más de un contenedor, hay que indicar cuál con `-c <nombre-contenedor>`.
+			
+			*Ej: el pod `svclb-traefik-...` tiene un contenedor por cada puerto expuesto (`lb-tcp-80`, `lb-tcp-443`), así que para ver solo los logs del puerto 80:*
+			```bash
+				kubectl logs svclb-traefik-xxxxx -n kube-system -c lb-tcp-80
+			```
 
 ---
 
-7. **Entendiendo el 401 de la URL del metrics-server**
-
-  - Si abrimos en el navegador la URL que devuelve `kubectl cluster-info`, como `https://192.168.56.110:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy`, es normal que salga `Unauthorized`.
-  
-  - Esa URL es un endpoint de la API de Kubernetes, no una página web pública.
-  
-  - El navegador no lleva las credenciales/certificados de `kubectl`, así que la respuesta 401 significa que el clúster está protegiendo correctamente el acceso.
-
----
-
-8. **Comandos de limpieza y recreación de vagrant**
+7. **Comandos de limpieza y recreación de vagrant**
 
 - Apagar las máquinas (SIN destruirlas): `vagrant halt`
 - Si queremos volver a arrancarlas tras detenerlaspodemos hacer otra vez `vagrant up`.
@@ -117,7 +143,6 @@ Es ideal para despliegues IoT (Internet of Things), Edge computing y aprendizaje
   ```bash
   vagrant destroy -f
   ```
-- Borrará las VMs definitivamente recuperando el almacenamiento.
 - El flag `-f` sirve para no tener que estar confirmando la destrucción de cada nodo de forma manual (full).
   
 
