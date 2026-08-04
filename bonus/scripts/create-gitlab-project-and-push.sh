@@ -5,23 +5,25 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"				# Directorio raíz del proyecto
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"				# Path por defecto del kubeconfig dentro de la VM
-PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh	
+PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh
 
-# Re-ejecución automática dentro de la VM si se lanza desde el host
+# Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
-    if command -v vagrant >/dev/null 2>&1 && [ -f "${BONUS_ROOT}/Vagrantfile" ]; then
-        cd "$BONUS_ROOT"
+    P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
+    if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
+        cd "$P3_ROOT"
         BONUS_INSIDE_VM=1 vagrant ssh -c \
-            'cd /vagrant && BONUS_INSIDE_VM=1 bash /vagrant/scripts/create-gitlab-project-and-push.sh'
+            'cd /vagrant && BONUS_INSIDE_VM=1 bash /bonus/scripts/create-gitlab-project-and-push.sh'
         exit $?
     fi
-    echo "No encuentro el kubeconfig. Ejecuta primero 'vagrant up'."
+    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/ y luego ./scripts/install.sh desde bonus/."
     exit 1
 fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
-GITLAB_VM_URL="http://gitlab.localhost"
+# El loadbalancer de k3d lo publica p3 en el puerto 8080 de la VM
+GITLAB_VM_URL="http://gitlab.localhost:8080"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
 PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
@@ -83,8 +85,8 @@ create_gitlab_pat() {
 push_to_gitlab() {
     log "4/4" "Haciendo push del manifiesto a GitLab..."
 
-    if [ -f "/vagrant/confs/deployment.yaml" ]; then
-        MANIFEST_PATH="/vagrant/confs/deployment.yaml"
+    if [ -f "/bonus/confs/deployment.yaml" ]; then
+        MANIFEST_PATH="/bonus/confs/deployment.yaml"
     else
         MANIFEST_PATH="${BONUS_ROOT}/confs/deployment.yaml"
     fi
@@ -126,7 +128,7 @@ echo "============================================================"
 echo "  Repositorio GitLab listo"
 echo "============================================================"
 echo ""
-echo "  URL:      http://gitlab.localhost:8081/${PROJECT_FULL_PATH}"
+echo "  URL:      http://gitlab.localhost:8080/${PROJECT_FULL_PATH}"
 echo "  rama:     main"
 echo "  manifest: deployment.yaml  (imagen: mikelezc/playground:v1)"
 echo ""

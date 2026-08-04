@@ -1,12 +1,12 @@
 # Parte 3: K3d y Argo CD
 
-En la Parte 2 provisionamos con Vagrant una única VM y desplegábamos las aplicaciones contra un `Ingress` fijo. En esta Parte 3 el enunciado pide justo lo contrario: nada de Vagrant, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
+En la Parte 2 provisionamos con Vagrant una única VM y desplegábamos las aplicaciones contra un `Ingress` fijo. En esta Parte 3 el enunciado pide usar **K3d para levantar el clúster**, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
 
-Para esto se nos pide también cambiar la herramienta de clúster: en vez de instalar K3s como servicio dentro de una VM, usamos **K3d**, que ejecuta K3s dentro de contenedores Docker. 
+Aquí Vagrant cambia de papel: ya no instala K3s directamente como en las Partes 1 y 2, solo nos da la VM dentro de la cual Docker levanta el clúster K3d. Esto es lo que permite encadenar el bonus más adelante, que extiende esa misma VM añadiendo GitLab.
 
 El flujo completo quedaría de la siguiente manera:
 
-1. Levantamos un clúster K3d (K3s corriendo en contenedores, sin VM).
+1. Levantamos un clúster K3d (es como K3s pero corriendo cada nodo en un contenedor individual).
 2. Instalamos Argo CD dentro del clúster.
 3. Argo CD observa un repositorio de GitHub público con los manifiestos.
 4. Cuando cambia el manifiesto en GitHub, Argo CD reconcilia y aplica el estado deseado en el clúster.
@@ -62,23 +62,31 @@ GitHub (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 
 ## Contenido de la carpeta
 
-1. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
+1. [Vagrantfile](Vagrantfile): define la VM sobre la que corre K3d (`P3_MEMORY`/`P3_CPUS` para el tamaño, 2048MB/2CPU por defecto) y monta también `../bonus` en `/bonus`, para que el bonus pueda extender esta misma VM más adelante.
 
-2. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de la `Application` de Argo CD (repo, rama, path y política de sincronización).
+2. [scripts/install.sh](scripts/install.sh): bootstrap principal. Instala dependencias, crea el clúster, instala Argo CD y aplica la `Application`.
 
-3. [repo-github/deployment.yaml](repo-github/deployment.yaml): **copia de referencia, no está en uso**. Ningún script de esta carpeta lo lee ni lo aplica; se guarda aquí solo como muestra para poder revisarlo sin salir del repositorio. El manifiesto real, el que Argo CD monitoriza y aplica en el clúster, vive en el repo de GitHub:
+3. [confs/namespaces.yaml](confs/namespaces.yaml): los namespaces `argocd` y `dev`.
+
+4. [confs/argocd-ingress.yaml](confs/argocd-ingress.yaml): Ingress que expone Argo CD por HTTP a través de Traefik.
+
+5. [confs/argocd-reconciliation-patch.yaml](confs/argocd-reconciliation-patch.yaml) y [confs/argocd-insecure-patch.yaml](confs/argocd-insecure-patch.yaml): parches (`kubectl patch --patch-file`) que bajan la reconciliación de Argo CD a 5s y le hacen servir HTTP plano en vez de HTTPS autofirmado.
+
+6. [confs/argocd.yaml](confs/argocd.yaml): manifiesto de la `Application` de Argo CD (repo, rama, path y política de sincronización).
+
+7. [repo-github/deployment.yaml](repo-github/deployment.yaml): **copia de referencia, no está en uso**. Ningún script de esta carpeta lo lee ni lo aplica; se guarda aquí solo como muestra para poder revisarlo sin salir del repositorio. El manifiesto real, el que Argo CD monitoriza y aplica en el clúster, vive en el repo de GitHub:
    - `https://github.com/mikelezc/mlezcano-iot-argocd`
 
-4. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
+8. [repo-dockerhub/app.py](repo-dockerhub/app.py) y [repo-dockerhub/Dockerfile](repo-dockerhub/Dockerfile): **copia de referencia, no está en uso**. Es el código fuente y la receta con la que se construyó, una única vez y de forma manual, la imagen que sí corre en el clúster. Lo que descarga y ejecuta el `Deployment` es la imagen ya construida en Docker Hub, no este código:
    - `https://hub.docker.com/r/mikelezc/playground`
 
-5. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto). Incluye también [toolbox/reset.sh](toolbox/reset.sh), el script de limpieza del clúster.
+9. [toolbox/](toolbox/): imagen Docker con `kubectl`/`k3d` ya instalados, para máquinas sin privilegios de host (ver más abajo cuando lleguemos a la sección de arranque del proyecto). Incluye también [toolbox/reset.sh](toolbox/reset.sh), el script de limpieza del clúster.
 
 ---
 
 ## Requisitos previos
 
-1. Docker Desktop (o daemon Docker) activo.
+1. Docker Desktop (o daemon Docker) activo si decidimos levantar el clúster directamente sobre el host (con o sin `toolbox/`).
 
 2. Acceso a GitHub y a un repositorio público con el login de un miembro del equipo en el nombre.
    - `https://github.com/mikelezc/mlezcano-iot-argocd`
@@ -106,7 +114,7 @@ El script detecta el sistema operativo (`Darwin`/`Linux`), instala Docker/`kubec
 
 ### Alternativa sin privilegios de host
 
-Si no hay privilegios para instalar `kubectl`/`k3d` en el sistema, usamos el toolbox en `toolbox/`: una imagen Docker con ambos ya instalados, que se ejecuta montando el socket de Docker del host (`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. El clúster K3d se crea igual como contenedores del Docker del host (no anidados), y los puertos publicados (8080, 8888) quedan accesibles en el `localhost` real de la máquina, exactamente igual que con la instalación directa.
+Si no hay privilegios para instalar `kubectl`/`k3d` en el sistema, podemos usar el toolbox en `toolbox/`: una imagen Docker con ambos ya instalados, que se ejecuta montando el socket de Docker del host (`-v /var/run/docker.sock:/var/run/docker.sock`) y con `--network host`. El clúster K3d se crea igual como contenedores del Docker del host (no anidados), y los puertos publicados (8080, 8888) quedan accesibles en el `localhost` real de la máquina, exactamente igual que con la instalación directa.
 
 `scripts/install.sh` no cambia: sus comprobaciones `command -v kubectl/k3d` encuentran los binarios ya presentes en la imagen del toolbox y omiten la instalación.
 
@@ -120,6 +128,26 @@ También sirve para lanzar comandos sueltos con las herramientas ya listas:
 ./toolbox/run.sh kubectl get pods -n dev
 ./toolbox/run.sh   # shell interactiva con kubectl/k3d/docker(cliente)/git/jq
 ```
+
+---
+
+### Alternativa con Vagrant (necesaria para encadenar el bonus)
+
+Los dos caminos anteriores no usan ninguna VM — el clúster corre directamente sobre el Docker del host. Si además queremos levantar el bonus (que añade GitLab a este mismo laboratorio, tal y como pide el subject), usamos este tercer camino: levantar p3 dentro de su propia VM.
+
+```bash
+vagrant up
+```
+
+Por defecto la VM es ligera (2048MB/2CPU — p3 solo no necesita más). El `Vagrantfile` acepta `P3_MEMORY`/`P3_CPUS` por si hiciera falta ajustarlo:
+
+```bash
+P3_MEMORY=4096 P3_CPUS=2 vagrant up
+```
+
+`scripts/install.sh` corre igual dentro de la VM (como aprovisionador, con privilegios), sin ningún cambio respecto al camino sin VM.
+
+*Nota sobre volver a aprovisionar*: `install.sh` borra y recrea el clúster K3d en cada ejecución. Si el bonus ya ha instalado GitLab encima (ver `bonus/README.md`), un `vagrant provision` o un segundo `vagrant up` se lo llevaría por delante — solo lo haremos para reiniciar el proceso.
 
 ---
 
@@ -139,6 +167,8 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 ---
 
 ## Checklist de verificación del Subject
+
+*Nota: Para hacer todas las comprobaciones por consola, entraremos antes de nada a la VM con `vagrant ssh mlezcanoS`*
 
 1. **Verificamos los namespaces requeridos**:
 
@@ -166,7 +196,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-3. **Verificamos que Argo CD está funcionando y desplegando lo correcto** P
+3. **Verificamos que Argo CD está funcionando y desplegando lo correcto**
 
 ### Primero por `kubectl` (es decir, por terminal):
 

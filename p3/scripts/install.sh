@@ -1,8 +1,14 @@
 #!/bin/bash
-set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Este script instala un cluster k3d, Argo CD y la aplicación de ejemplo en un entorno local.
+# Maneja tanto despliegues dentro de Vagrant como en un entorno local. (por eso tenemos la parte multi-plataforma).
+
+
+set -euo pipefail	# Salir si hay errores, variables no definidas o fallos en pipes
+
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"					# Directorio raíz del proyecto
 if [[ -f "/vagrant/confs/argocd.yaml" ]]; then
   REPO_ROOT="/vagrant"
 else
@@ -15,9 +21,14 @@ log() {
   printf '\n==> %s\n' "$1"
 }
 
+# Función para instalar herramientas necesarias en Linux (Docker, kubectl, k3d)
 install_linux_tools() {
   if ! command -v docker >/dev/null 2>&1; then
     curl -fsSL https://get.docker.com | sudo sh
+  fi
+
+  if id vagrant >/dev/null 2>&1 && ! id -nG vagrant 2>/dev/null | grep -qw docker; then
+    usermod -aG docker vagrant
   fi
 
   if ! command -v kubectl >/dev/null 2>&1; then
@@ -36,8 +47,33 @@ install_linux_tools() {
   if ! command -v k3d >/dev/null 2>&1; then
     curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
   fi
+
+  configure_docker_dns
 }
 
+# Función para configurar DNS en Docker para Linux, asegurando que los contenedores puedan resolver nombres externos.
+configure_docker_dns() {
+  local daemon_json="/etc/docker/daemon.json"
+  if [ -f "$daemon_json" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$daemon_json" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        config = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError):
+    config = {}
+config["dns"] = ["8.8.8.8", "1.1.1.1"]
+with open(path, "w") as f:
+    json.dump(config, f, indent=2)
+PY
+  else
+    printf '{\n  "dns": ["8.8.8.8", "1.1.1.1"]\n}\n' > "$daemon_json"
+  fi
+  systemctl restart docker
+}
+
+# Función para instalar herramientas necesarias en macOS (Homebrew, kubectl, k3d)
 install_macos_tools() {
   if ! command -v brew >/dev/null 2>&1; then
     echo "Homebrew no está instalado. Instálalo antes de continuar." >&2
@@ -65,12 +101,30 @@ ensure_docker_ready() {
   fi
 }
 
+# parcheo de los pods de CoreDNS para que hagan forward a servidores DNS públicos 
+# porque el DNS de k3d es inestable y a veces falla (cloudflare, google, etc)
 patch_coredns() {
   kubectl -n kube-system get configmap coredns -o yaml | \
     sed 's/forward \. \/etc\/resolv.conf/forward . 8.8.8.8 1.1.1.1/' | \
     kubectl apply -f - >/dev/null
   kubectl rollout restart deployment/coredns -n kube-system >/dev/null
   kubectl rollout status deployment/coredns -n kube-system --timeout=120s >/dev/null
+}
+
+# Comprobamos que el DNS externo resuelve justo antes del momento crítico (cuando Argo CD
+# va a intentar el primer git fetch), y reaplicamos el parche si hiciera falta.
+wait_for_dns() {
+  for attempt in 1 2 3 4 5 6; do
+    if kubectl run "dns-check-${attempt}" --rm -i --restart=Never \
+        --image=busybox:1.36 --timeout=20s \
+        --command -- nslookup github.com >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "DNS externo aún no responde, reaplicando el parche de CoreDNS (intento $attempt/6)..."
+    patch_coredns
+    sleep 3
+  done
+  return 1
 }
 
 wait_for_argocd() {
@@ -104,47 +158,38 @@ main() {
   log "Esperando nodos listos"
   kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null
 
+  if [ -d /home/vagrant ]; then				# Despliegue dentro de Vagrant
+    log "Exportando kubeconfig para el usuario vagrant"
+    mkdir -p /home/vagrant/.kube
+    k3d kubeconfig get "$CLUSTER_NAME" > /home/vagrant/.kube/config
+    chown -R vagrant:vagrant /home/vagrant/.kube
+  fi										# Despliegue en local
+
   log "Ajustando CoreDNS para salida estable a Internet"
   patch_coredns
 
   log "Creando namespaces"
-  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-  kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl apply -f "$REPO_ROOT/confs/namespaces.yaml" >/dev/null
 
   log "Instalando Argo CD"
   kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" >/dev/null
   wait_for_argocd
 
   log "Ajustando la reconciliación de Argo CD a pocos segundos"
-  kubectl patch configmap argocd-cm -n argocd --type merge -p '{"data":{"timeout.reconciliation":"5s","timeout.reconciliation.jitter":"0s"}}' >/dev/null
+  kubectl patch configmap argocd-cm -n argocd --type merge --patch-file "$REPO_ROOT/confs/argocd-reconciliation-patch.yaml" >/dev/null
   kubectl rollout restart statefulset/argocd-application-controller -n argocd >/dev/null
   kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=180s >/dev/null
 
   log "Exponiendo Argo CD por HTTP"
-  kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"server.insecure":"true"}}' >/dev/null
+  kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge --patch-file "$REPO_ROOT/confs/argocd-insecure-patch.yaml" >/dev/null
   kubectl rollout restart deployment/argocd-server -n argocd >/dev/null
   kubectl rollout status deployment/argocd-server -n argocd --timeout=180s >/dev/null
-  cat <<'EOF' | kubectl apply -n argocd -f - >/dev/null
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-server-ingress
-  annotations:
-    ingress.kubernetes.io/ssl-redirect: "false"
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-spec:
-  ingressClassName: traefik
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: argocd-server
-            port:
-              name: http
-EOF
+  kubectl apply -n argocd -f "$REPO_ROOT/confs/argocd-ingress.yaml" >/dev/null
+
+  log "Verificando resolución DNS externa antes de aplicar la Application"
+  if ! wait_for_dns; then
+    echo "[WARN] El DNS externo sigue sin responder tras varios intentos; Argo CD podría fallar al sincronizar" >&2
+  fi
 
   log "Aplicando la Application de Argo CD"
   kubectl apply -f "$REPO_ROOT/confs/argocd.yaml" >/dev/null
