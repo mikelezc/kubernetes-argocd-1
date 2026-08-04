@@ -2,67 +2,66 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
   # ==========================================
+  # bento/ubuntu-26.04: última LTS de Ubuntu, en su variante Bento (imagen recortada). 
+  # No es la distro más ligera posible (Alpine pesa menos), pero mantiene systemd/apt,
+  # que es lo que espera el script oficial de instalación de k3s sin fricción.
+
+  BOX				= "bento/ubuntu-26.04"
+  SERVER_VM_NAME	= "mlezcanoS"
+  WORKER_VM_NAME	= "mlezcanoSW"
+  SERVER_IP			= "192.168.56.110"
+  WORKER_IP			= "192.168.56.111"
+  NETWORK_NAME		= "private_network"
 
   # Determinamos la arquitectura del sistema donde se ejecuta:
-  if RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64') 
-	# === MAC APPLE SILICON ===
-    config.vm.box = "bento/ubuntu-26.04"
-    # Vagrant en Mac M-Series usará Parallels o VMware
-    provider = ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop"
-  else
-    # === Intel/Linux ===
-    config.vm.box = "bento/ubuntu-26.04"
-    provider = "virtualbox"
-  end
+  is_mac_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ ||
+               (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+  # Vagrant en Mac M-Series usará Parallels o VMware; en Intel/Linux, VirtualBox
+  provider = is_mac_arm ? (ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop") : "virtualbox"
+
+  config.vm.box = BOX
 
   # ==========================================
   # CONFIGURACIÓN GLOBAL (Especificaciones de CPU y RAM)
   # ==========================================
   config.vm.provider provider do |v|
-    if provider == "virtualbox" || provider == "parallels"
-      v.memory = 512
-      v.cpus = 1
-    elsif provider == "vmware_desktop"
+    if provider == "vmware_desktop"
       v.vmx["memsize"] = "512"
       v.vmx["numvcpus"] = "1"
+    else
+      v.memory = 512
+      v.cpus = 1
+    end
+  end
+
+  # Asigna el nombre visible de la VM según el provider en uso
+  set_vm_name = lambda do |machine, name|
+    machine.vm.provider provider do |v|
+      provider == "vmware_desktop" ? v.vmx["displayname"] = name : v.name = name
     end
   end
 
   # ==========================================
   # MÁQUINA 1: Server (Controller)
   # ==========================================
-  config.vm.define "mlezcanoS" do |server|
-    server.vm.hostname = "mlezcanoS"
-    server.vm.network "private_network", ip: "192.168.56.110"
-    
-    server.vm.provider provider do |v|
-      if provider == "virtualbox" || provider == "parallels"
-        v.name = "mlezcanoS"
-      elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "mlezcanoS"
-      end
-    end
-    
-    # Ejecutamos el script cuando se crea la máquina
-    server.vm.provision "shell", path: "scripts/server.sh", args: "192.168.56.110"
+  config.vm.define SERVER_VM_NAME do |server|
+    server.vm.hostname = SERVER_VM_NAME
+    server.vm.network NETWORK_NAME, ip: SERVER_IP
+    set_vm_name.call(server, SERVER_VM_NAME)
+
+    # run server.sh cuando se crea su máquina virtual. Le pasamos server IP como argumento
+    server.vm.provision "shell", path: "scripts/server.sh", args: SERVER_IP
   end
 
   # ==========================================
   # MÁQUINA 2: Worker (Agent)
   # ==========================================
-  config.vm.define "mlezcanoSW" do |worker|
-    worker.vm.hostname = "mlezcanoSW"
-    worker.vm.network "private_network", ip: "192.168.56.111"
+  config.vm.define WORKER_VM_NAME do |worker|
+    worker.vm.hostname = WORKER_VM_NAME
+    worker.vm.network NETWORK_NAME, ip: WORKER_IP
+    set_vm_name.call(worker, WORKER_VM_NAME)
 
-    worker.vm.provider provider do |v|
-      if provider == "virtualbox" || provider == "parallels"
-        v.name = "mlezcanoSW"
-      elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "mlezcanoSW"
-      end
-    end
-    
-    # Ejecutamos el script del worker, pasándole la IP del jefe y la suya propia
-    worker.vm.provision "shell", path: "scripts/worker.sh", args: "192.168.56.110 192.168.56.111"
+    # run worker.sh cuando se crea su máquina virtual. Le pasamos server IP y worker IP como argumentos
+    worker.vm.provision "shell", path: "scripts/worker.sh", args: "#{SERVER_IP} #{WORKER_IP}"
   end
 end
