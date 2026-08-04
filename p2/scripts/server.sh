@@ -1,18 +1,12 @@
 #!/bin/bash
-# scripts/server.sh
-
-# script basado en p1/scripts/server.sh
-# para más explicaciones sobre las diferentes partes del script, 
-# es recomendable consultar el archivo p1/scripts/server.sh
 
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 set -euo pipefail
 
 SERVER_IP=$1
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
-
 
 echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} Instalando K3S en modo SERVER...${NC}"
@@ -32,18 +26,17 @@ while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
   sleep 2
 done
 
-# Esperamos un poco a que Traefik y CoreDNS levanten para recibir configuraciones:
+# Esperamos a que Traefik y CoreDNS levanten para recibir configuraciones:
 sleep 15
 
 echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} Desplegando las 3 aplicaciones en el clúster...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
-# /vagrant aquí sigue siendo la carpeta compartida P2, así que 
-# podemos aplicar los yamls de forma automática usando kubectl.
-# --kubeconfig le dice donde está la autorización del clúster.
 
+# Indicamos a kubectl dónde está el archivo de configuración del clúster k3s
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
+# Usamos kubectl para desplegar cada manifesto de aplicación y el manifiesto de Ingress
 kubectl apply -f /vagrant/confs/app1.yaml
 kubectl apply -f /vagrant/confs/app2.yaml
 kubectl apply -f /vagrant/confs/app3.yaml
