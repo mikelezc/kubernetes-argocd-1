@@ -1,6 +1,6 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
+  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4)
   # ==========================================
   # bento/ubuntu-26.04: última LTS de Ubuntu, en su variante Bento (imagen recortada). 
   # No es la distro más ligera posible (Alpine pesa menos), pero mantiene systemd/apt,
