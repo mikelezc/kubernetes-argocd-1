@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Revierte la Application "iot-app" de Argo CD a su fuente original de
-# GitHub, reaplicando p3/confs/argocd.yaml tal cual.
+# GitHub, reaplicando p3/confs/argocd.yaml.
 
 set -euo pipefail
 
