@@ -169,28 +169,11 @@ P3_MEMORY=4096 P3_CPUS=2 vagrant up
 
 `scripts/install.sh` corre igual dentro de la VM (como aprovisionador, con privilegios), sin ningún cambio respecto al camino sin VM.
 
-*Nota sobre volver a aprovisionar*: `install.sh` borra y recrea el clúster K3d en cada ejecución. Si el bonus ya ha instalado GitLab encima (ver `bonus/README.md`), un `vagrant provision` o un segundo `vagrant up` se lo llevaría por delante — solo lo haremos para reiniciar el proceso.
-
----
-
-Al terminar el script veremos lo siguiente:
-
-- Argo CD: `http://localhost:8080`
-- App: `http://localhost:8888`
-- Usuario Argo CD: `admin`
-- Password: la imprime el script al final
-
-Para obtener la contraseña de Argo CD manualmente en caso de necesitarlo:
-
-```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"
-```
-
 ---
 
 ## Checklist de verificación del Subject
 
-*Nota: Para hacer todas las comprobaciones por consola, entraremos antes de nada a la VM con `vagrant ssh mlezcanoS`*
+*Nota: Para hacer todas las comprobaciones por consola, entraremos como siempre, a la VM con `vagrant ssh mlezcanoS`*
 
 1. **Verificamos los namespaces requeridos**:
 
@@ -210,10 +193,6 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    kubectl get pods -n dev
    ```
 
-   **Namespace** es la partición lógica que organiza y aísla recursos dentro del clúster 
-   
-   **Pod** es la unidad mínima de ejecución (uno o más contenedores) que corre dentro de un nodo. Todo Pod vive dentro de un único Namespace.
-
    Veremos por tanto el `pod` que contiene nuestra aplicación `mlezcano-playground`.
 
 ---
@@ -228,8 +207,6 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
      kubectl get applications -n argocd
      ```
 
-	 Si apareciera `OutOfSync` o `ComparisonError`, tendríamos que revisar `repoURL` y `targetRevision` en `confs/argocd.yaml` para que sean correctos y que el repositorio sea público.
-
 	 ---
 
    - Los pods de Argo CD (`server`, `repo-server`, `application-controller`...) deben estar en `Running` con `READY 1/1` (o `2/2` si fuera el caso).
@@ -242,7 +219,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 	 ---
 
-   - Debe existir el Service que expone la app; con K3d se accede en `http://localhost:8888`.
+   - Debe existir el Service que expone la app, con K3d se accede en `http://localhost:8888`.
 
      ```bash
      kubectl get svc -n dev
@@ -256,7 +233,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    
    Accedemos a `http://localhost:8080` con el `Username` `admin` y el password que facilita el grupo (el mismo que imprime `install.sh` al terminar).
 
-   *Nota: Recuerda que si hemos perdido el password podrmeos recuperarlo en todo momento poniendo en la terminal:* `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"`
+   *Nota: Si hemos perdido el password podrmeos recuperarlo en todo momento poniendo en la terminal:* `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d && printf "\n"`
    
    
    **Vista de árbol de la `Application` `iot-app`** 
@@ -307,7 +284,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 ---
 
-6. **Confirmamos por CLI que lo que corre viene realmente de GitHub y Docker Hub**, no de las copias de referencia locales. Los siguientes comandos se ejecutan desde `p3/` (o desde `/workspace` si estamos dentro del toolbox). Si `grep` da `No such file or directory`, es que estamos en otra carpeta:
+6. **Confirmamos por CLI que lo que corre viene realmente de GitHub y Docker Hub**
 
     ```bash
     # El repositorio que Argo CD monitoriza de verdad (no repo-github/deployment.yaml)
@@ -329,8 +306,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    Vamos a `https://github.com/mikelezc/mlezcano-iot-argocd` y editamos el yaml. 
    
    Hay que cambiar **los dos campos que identifican la versión, no solo uno**: 
-   
-   El `image` (el tag de Docker Hub) y el `env VERSION` (lo que de verdad decide qué HTML sirve `app.py` en tiempo de ejecución). Si solo tocamos el `env`, la app ya responde en `v2`, pero el campo `IMAGES` de Argo CD y el `image` que devuelve `kubectl` se quedan apuntando a `v1`, dando la falsa impresión de que el cambio no se ha aplicado del todo:
+
 
    ```yaml
    containers:
@@ -366,8 +342,6 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
    curl http://localhost:8888/
    ```
 
-   La diferencia es reconocible a simple vista: fondo verde y "VERSION 1" en `v1`, fondo azul y "VERSION 2" en `v2`, además del mensaje de bienvenida y el JSON de estado:
-
    | `v1` | `v2` |
    |---|---|
    | ![App en versión 1](images/app-v1.png) | ![App en versión 2](images/app-v2.png) |
@@ -376,10 +350,16 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 9. **Limpieza**: desde `p3/`,
 
+	**Si hemos usado toolbox**
+
     ```bash
     ./toolbox/reset.sh          # borra el clúster k3d
     ./toolbox/reset.sh --deep   # además limpia los contenedores/volúmenes/red de ese clúster en Docker
     ./toolbox/reset.sh --full   # --deep + borra también la imagen del toolbox y su kubeconfig cacheado
     ```
 
-    *Solo toca recursos cuyo nombre empieza por `k3d-iot-cluster` (o la imagen `iot-p3-toolbox`), así que no afecta a otros proyectos que compartan la misma instalación de Docker. No hace falta tener `k3d` instalado en el host para usarlo: si no lo encuentra, usa el propio toolbox para borrar el clúster.*
+	**Si hemos usado Vagrant**
+
+	 ```bash
+    vagrant destroy -f
+    ```
