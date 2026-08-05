@@ -15,6 +15,8 @@ spec:
       containers:
       - name: nginx-app3
         image: nginx:alpine
+        # Downward API: exponemos metadata del propio Pod como env vars, para que la
+        # página muestre en qué pod/IP/nodo real se ha servido cada petición.
         env:
         - name: POD_NAME
           valueFrom:
@@ -28,6 +30,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        # Generamos el index.html al arrancar con un heredoc en vez de construir una
+        # imagen Docker propia: reutilizamos nginx:alpine genérico, sin publicar nada.
         command:
         - /bin/sh
         - -c

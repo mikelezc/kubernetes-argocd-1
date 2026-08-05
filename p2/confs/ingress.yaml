@@ -1,6 +1,7 @@
-# Manifiesto para redirigir el tráfico según el HOST a las aplicaciones correspondientes.
+# Ingress: recurso nativo de K8s para definir reglas de enrutamiento,
+# HTTP/HTTPS entrante hacia los servicios del clúster.
 apiVersion: networking.k8s.io/v1
-kind: Ingress
+kind: Ingress 
 metadata:
   name: iot-ingress
 spec:
