@@ -1,8 +1,8 @@
 # Parte 3: K3d y Argo CD
 
-En la Parte 2 provisionamos con Vagrant una única VM y desplegábamos las aplicaciones contra un `Ingress` fijo. En esta Parte 3 el enunciado pide usar **K3d para levantar el clúster**, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
+En esta Parte 3 el enunciado pide usar **K3d para levantar el clúster**, y las aplicaciones se mantienen sincronizadas de forma automática, gestionadas a través un controlador **GitOps** (Argo CD) que vigila un repositorio Git.
 
-Aquí Vagrant cambia de papel: ya no instala K3s directamente como en las Partes 1 y 2, solo nos da la VM dentro de la cual Docker levanta el clúster K3d. Esto es lo que permite encadenar el bonus más adelante, que extiende esa misma VM añadiendo GitLab.
+Aquí Vagrant se utiliza símplemente como wrapper: ya no instala K3s directamente como en las Partes 1 y 2, solo nos da la VM dentro de la cual Docker levanta el clúster K3d (de forma anidada). Esto nos permite permite enlazar el bonus más adelante, que extiende esa misma VM añadiendo GitLab.
 
 El flujo completo quedaría de la siguiente manera:
 

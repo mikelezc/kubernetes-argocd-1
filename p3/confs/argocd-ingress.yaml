@@ -1,4 +1,4 @@
-# Ingress para exponer Argo CD por HTTP (modo insecure) a través de Traefik.
+# Ingress para exponer Argo CD por HTTP a través de Traefik.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

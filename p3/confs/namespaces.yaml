@@ -1,5 +1,6 @@
-# Los dos namespaces requeridos por el subject: argocd (el controlador GitOps)
-# y dev (donde Argo CD despliega la app).
+# Los dos namespaces requeridos por el subject: 
+#   - argocd (el controlador GitOps)
+#   - dev (donde Argo CD despliega la app).
 apiVersion: v1
 kind: Namespace
 metadata:

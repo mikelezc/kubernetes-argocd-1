@@ -3,6 +3,9 @@
 # Script de instalación de un cluster k3d, Argo CD y la aplicación de ejemplo.
 # Maneja tanto despliegues dentro de Vagrant como en un entorno local (Linux y macOS ARM).
 
+CYAN='\033[0;36m'
+NC='\033[0m'
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
@@ -18,7 +21,13 @@ CLUSTER_NAME="iot-cluster"
 ARGOCD_VERSION="v2.10.4"
 
 log() {
-  printf '\n==> %s\n' "$1"
+  printf '\n%b==> %s%b\n' "$CYAN" "$1" "$NC"
+}
+
+banner() {
+  echo -e "${CYAN}=========================================================${NC}"
+  echo -e "${CYAN} $1${NC}"
+  echo -e "${CYAN}=========================================================${NC}"
 }
 
 # Función para instalar las herramientas necesarias en Linux (Docker, kubectl, k3d)
@@ -137,18 +146,15 @@ wait_for_argocd() {
 }
 
 main() {
-  log "Instalando dependencias"
+  banner "1/5 Instalando dependencias (Docker, kubectl, k3d)"
   case "$(uname -s)" in
     Darwin) install_macos_tools ;;
     Linux) install_linux_tools ;;
     *) echo "Sistema operativo no soportado" >&2; exit 1 ;;
   esac
-
   ensure_docker_ready
 
-  echo -e "${CYAN}=========================================================${NC}"
-  echo -e "${CYAN} 1/3 Creando cluster k3d...${NC}"
-  echo -e "${CYAN}=========================================================${NC}"
+  banner "2/5 Creando el clúster k3d"
   k3d cluster delete "$CLUSTER_NAME" >/dev/null 2>&1 || true
   k3d cluster create "$CLUSTER_NAME" \
     --servers 1 \
@@ -158,7 +164,7 @@ main() {
     -p "8888:30080@server:0" \
     --k3s-arg '--disable=metrics-server@server:0' >/dev/null
 
-  log "Esperando nodos listos"
+  log "Esperando a que los nodos estén listos"
   kubectl wait --for=condition=Ready node --all --timeout=180s >/dev/null
 
   if [ -d /home/vagrant ]; then				# Despliegue dentro de Vagrant
@@ -171,14 +177,15 @@ main() {
   log "Ajustando CoreDNS para salida estable a Internet"
   patch_coredns
 
-  log "Creando namespaces"
+  banner "3/5 Creando namespaces"
   kubectl apply -f "$REPO_ROOT/confs/namespaces.yaml" >/dev/null
+  log "Namespaces creados: $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}')"
 
-  log "Instalando Argo CD"
+  banner "4/5 Instalando Argo CD"
   kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" >/dev/null
   wait_for_argocd
 
-  log "Ajustando la reconciliación de Argo CD a pocos segundos"
+  log "Ajustando la reconciliación de Argo CD (a pocos segundos)"
   kubectl patch configmap argocd-cm -n argocd --type merge --patch-file "$REPO_ROOT/confs/argocd-reconciliation-patch.yaml" >/dev/null
   kubectl rollout restart statefulset/argocd-application-controller -n argocd >/dev/null
   kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=180s >/dev/null
@@ -189,12 +196,11 @@ main() {
   kubectl rollout status deployment/argocd-server -n argocd --timeout=180s >/dev/null
   kubectl apply -n argocd -f "$REPO_ROOT/confs/argocd-ingress.yaml" >/dev/null
 
+  banner "5/5 Desplegando la Application de Argo CD"
   log "Verificando resolución DNS externa antes de aplicar la Application"
   if ! wait_for_dns; then
     echo "[WARN] El DNS externo sigue sin responder tras varios intentos; Argo CD podría fallar al sincronizar" >&2
   fi
-
-  log "Aplicando la Application de Argo CD"
   kubectl apply -f "$REPO_ROOT/confs/argocd.yaml" >/dev/null
 
   echo ""
