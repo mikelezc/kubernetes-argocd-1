@@ -1,59 +1,48 @@
 Vagrant.configure("2") do |config|
   # ==========================================
-  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4 USADO PARA DESARROLLO)
+  # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4)
   # ==========================================
-  is_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ || (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
-  provider = ENV['VAGRANT_DEFAULT_PROVIDER']
+ 
+  BOX            = "bento/ubuntu-26.04"
+  SERVER_VM_NAME = "mlezcanoS"
+  SERVER_IP      = "192.168.56.112"
 
-  if provider.nil? || provider.empty?
-    provider = is_arm ? "vmware_desktop" : "virtualbox"
-  end
+  is_mac_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ ||
+               (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
 
-  config.vm.box = "bento/ubuntu-26.04"
+  provider = is_mac_arm ? (ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop") : "virtualbox"
+
+  config.vm.box = BOX
 
   # ==========================================
-  # CONFIGURACIÓN DE LA MÁQUINA VIRTUAL (MEMORIA, CPU)
+  # CONFIGURACIÓN GLOBAL (Especificaciones de CPU y RAM)
   # ==========================================
-  # p3 por sí solo (K3d + Argo CD + una app) es ligero. Cuando el bonus mete
-  # GitLab en este mismo clúster, sube estos valores con P3_MEMORY/P3_CPUS y
-  # hace "vagrant reload" antes de instalar nada (ver bonus/scripts/install.sh).
-  memory = (ENV['P3_MEMORY'] || 2048).to_i
-  cpus   = (ENV['P3_CPUS']   || 2).to_i
 
   config.vm.provider provider do |v|
-    if provider == "virtualbox" || provider == "parallels"
-      v.memory = memory
-      v.cpus = cpus
-    elsif provider == "vmware_desktop"	#vmware_desktop: compatible con Mac
-      v.vmx["memsize"] = memory.to_s
-      v.vmx["numvcpus"] = cpus.to_s
-      v.vmx["cpuid.coresPerSocket"] = "1" # Para evitar problemas con VMware, configuramos 1 core por socket.
+    if provider == "vmware_desktop"
+      v.vmx["memsize"] = "2048"
+      v.vmx["numvcpus"] = "2"
+      v.vmx["cpuid.coresPerSocket"] = "1" # Evita problemas de arranque con VMware
+    else
+      v.memory = 2048
+      v.cpus = 2
     end
   end
 
   # ==========================================
-  # CONFIGURACIÓN DE LA MÁQUINA VIRTUAL (HOSTNAME, IP, PORTS)
+  # MÁQUINA ÚNICA: (wrapper k3d)
   # ==========================================
-  config.vm.define "mlezcanoS" do |server|
-    server.vm.hostname = "mlezcanoS"
-    server.vm.network "private_network", ip: "192.168.56.112"
+  config.vm.define SERVER_VM_NAME do |server|
+    server.vm.hostname = SERVER_VM_NAME
+    server.vm.network "private_network", ip: SERVER_IP
     server.vm.network "forwarded_port", guest: 8888, host: 8888, host_ip: "127.0.0.1", auto_correct: false
     server.vm.network "forwarded_port", guest: 8080, host: 8080, host_ip: "127.0.0.1", auto_correct: false
 
     server.vm.provider provider do |v|
-      if provider == "virtualbox" || provider == "parallels"
-        v.name = "mlezcanoS_p3"
-      elsif provider == "vmware_desktop"
-        v.vmx["displayname"] = "mlezcanoS_p3"
-      end
+      provider == "vmware_desktop" ? v.vmx["displayname"] = "#{SERVER_VM_NAME}_p3" : v.name = "#{SERVER_VM_NAME}_p3"
     end
 
-    # Vagrant solo sincroniza esta carpeta (p3/) en /vagrant por defecto.
-    # Este montaje adicional es el que permite que el bonus (carpeta hermana,
-    # no anidada) pueda ejecutar sus propios scripts/confs dentro de esta
-    # misma VM cuando decide extenderla con GitLab. Si "bonus/" no existiera,
-    # Vagrant simplemente ignoraría este montaje (create: true la crea vacía).
-    config.vm.synced_folder "../bonus", "/bonus", create: true
+    server.vm.synced_folder "../bonus", "/bonus", create: true
 
     # Provisionamiento: Ejecutamos el script de instalación con privilegios de administrador.
     server.vm.provision "shell", path: "scripts/install.sh", privileged: true
