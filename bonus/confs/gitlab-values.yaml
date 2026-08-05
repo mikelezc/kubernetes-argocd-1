@@ -1,5 +1,5 @@
 # Configuración "mega-ligera" de GitLab en Kubernetes.
-# Esta configuración es la que será utilizada por Helm para desplegar GitLab en el cluster de Kubernetes.
+# utilizada por Helm para desplegar GitLab en el cluster.
 global:
   edition: ce                   # Community Edition (evita la versión enterprise)
   hosts:
@@ -8,7 +8,7 @@ global:
   ingress:
     class: traefik              # si no, cada "helm upgrade" vuelve a dejar los Ingress sin clase y GitLab deja de responder
   kas:
-    enabled: false               # integración nativa de GitLab con K8s (su propia alternativa a Argo CD); no la usamos, usamos nuestro propio Argo CD
+    enabled: false              # integración nativa de GitLab con K8s (su propia alternativa a Argo CD); no la usamos, usamos nuestro propio Argo CD
 installCertmanager: false
 certmanager-issuer:
   email: admin@gitlab.local     # aunque no lo usaremos porque no habilitamos HTTPS, evita un error de TLS al instalar cert-manager
