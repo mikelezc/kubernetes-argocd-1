@@ -96,30 +96,48 @@ En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 da
 	 La columna `HOSTS` de `kubectl get ingress` solo lista los hostnames explícitos definidos en las reglas — como la regla de `app3` no tiene ninguno, no añade nada a esa columna, aunque sigue activa dentro del mismo recurso `iot-ingress` (una sola `Ingress` puede agrupar varias reglas). 
 	 
 	 Se puede comprobar con `kubectl describe ingress iot-ingress`, donde sí se ve la tercera regla con el host vacío (`*`) apuntando a `app3`.
+
+	 *Más abajo lo comprobaremos con el propio navegador.*
    
-   - **Configuración en el Host (ATENCIÓN: no funciona si no tenemos permiso para modificarlo):** Para poder probar la navegación directamente desde nuestro navegador web, podemos añadir las entradas DNS en el archivo `/etc/hosts` de nuestra máquina física:
+   - **Configuración en el Host (ATENCIÓN: no funciona si no tenemos permiso para modificarlo):** 
+   
+   Para poder probar la navegación directamente desde nuestro navegador web, podemos añadir las entradas DNS en el archivo `/etc/hosts` de nuestra máquina física:
      ```text
      192.168.56.110  app1.com app2.com app3.com
      ```
 
-	- **Navegación con `app1.com`/`app2.com`/`app3.com` sin editar `/etc/hosts`:** Si no tenemos permisos para modificar `/etc/hosts` (ej. en los equipos del campus), podemos lanzar Chrome con una regla de resolución de nombres solo para esa sesión del navegador:
+	- **Navegación con `app1.com`/`app2.com`/`app3.com` sin editar `/etc/hosts`:** 
+	
+	Si no tenemos permisos para modificar `/etc/hosts` (ej. en los equipos del campus), podemos lanzar Chrome con una regla de resolución de nombres solo para esa sesión del navegador:
 
 	  ```bash
 	  open -a "Google Chrome" --args --host-resolver-rules="MAP app1.com 192.168.56.110, MAP app2.com 192.168.56.110, MAP app3.com 192.168.56.110"
 	  ```
 
-	  **Debemos cerrar antes todas las ventanas de Chrome para que el flag se aplique.**
+	  ***Debemos cerrar antes todas las ventanas de Chrome para que el flag se aplique.***
 
-	- **Alternativa mediante Header Editor (si no podemos lanzar Chrome con flags):** Instalaremos la extensión **Header Editor** en el navegador y crearemos una regla nueva con esta configuración:
+	- **Comprobación real del catch-all de (con un host que no sea `app3.com`):**
+	
+	Para demostrar que el Ingress enruta *cualquier* host no reconocido a `app3` (y no solo ese dominio en concreto), mapeamos uno inventado, sin relación con `app1`/`app2`/`app3`:
+
+	  ```bash
+	  open -a "Google Chrome" --args --host-resolver-rules="MAP testcatch.test 192.168.56.110"
+	  ```
+
+	  Cerramos antes todas las ventanas de Chrome y navegamos a `http://testcatch.test`. Como ese host no coincide con ninguna regla explícita del Ingress, cae en la regla sin `host:` y debe mostrar igualmente "Hello from app3".
+
+	- **Alternativa mediante Header Editor (si no podemos lanzar Chrome con flags):** 
+	
+	Podemos instalar la extensión **Header Editor** en el navegador, crearemos una regla nueva con esta configuración:
 
 	  - **Tipo de regla:** `Modify request header`.
 	  - **Match type:** marca `Dominio` e introduce `192.168.56.110`.
-	  - **Execution → Request headers:** añade una entrada `host` → `app1.com` (o `app2.com` para la otra app).
+	  - **Execution → Request headers:** añadimos una entrada `host` → `app1.com` (o `app2.com` para la otra app).
 	  - Guardamos la regla y comprobamos que queda **activada** (interruptor en el listado principal de reglas).
 	  - Navegamos directamente a `http://192.168.56.110`; Traefik interpretará la cabecera `Host` inyectada e mostrará la web correspondiente.
 
 	  A tener en cuenta:
-	  - Como las reglas de `app1.com` y `app2.com` apuntan al mismo dominio de destino (`192.168.56.110`), **no pueden estar activas a la vez** (se pisarían entre sí). Crea una regla por app y activa solo la que quieras probar en cada momento.
+	  - Como las reglas de `app1.com` y `app2.com` apuntan al mismo dominio de destino (`192.168.56.110`), **no pueden estar activas a la vez** (se pisarían entre sí). Hay que crear una regla por app y activa solo la que quieras probar en cada momento.
 	  - **Caché del navegador:** si tras cambiar de regla activa seguimos viendo la app anterior, fuerza una recarga con `Control+Shift+R` (o desactivaremos la caché desde las DevTools → pestaña Network), ya que el navegador puede servir la respuesta cacheada sin llegar a aplicar la nueva cabecera.
 
    - **Validación del enrutamiento vía CLI:** Probamos el comportamiento del Ingress enviando peticiones con la cabecera `Host` directamente contra la IP del servidor. Cada dominio debe responder con el contenido HTML de su respectiva aplicación (`App1`, `App2` o `App3`).
@@ -144,10 +162,10 @@ En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 da
 - Apagar las máquinas (SIN destruirlas): `vagrant halt`
 - Si queremos volver a arrancarlas tras detenerlaspodemos hacer otra vez `vagrant up`.
 
-- **Para DESTRUIR por completo el clúster (Recomendado al acabar):**
+- **DESTRUIR por completo el clúster:**
 
   ```bash
   vagrant destroy -f
   ```
-- Borrará las VMs definitivamente recuperando el almacenamiento.
+  
 - El flag `-f` sirve para no tener que estar confirmando la destrucción de cada nodo de forma manual (full).
