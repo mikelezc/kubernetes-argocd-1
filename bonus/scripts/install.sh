@@ -31,6 +31,14 @@ if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
     if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
         cd "$P3_ROOT"
+
+        # Comprobamos que la VM de p3 está realmente arriba.
+        P3_STATE="$(vagrant status --machine-readable 2>/dev/null | awk -F, '$3 == "state" {print $4}')"
+        if [ "$P3_STATE" != "running" ]; then
+            echo "La VM de p3 no está levantada (estado: ${P3_STATE:-no creada}). Ejecuta 'vagrant up' desde p3/ antes de instalar el bonus." >&2
+            exit 1
+        fi
+
         # Comprobamos la RAM real de la VM antes de decidir si hace falta redimensionarla.
         CURRENT_MEM_MB="$(vagrant ssh -c "free -m | awk '/Mem:/ {print \$2}'" 2>/dev/null | tr -d '\r' | tail -n1)"
         if [ -z "$CURRENT_MEM_MB" ] || [ "$CURRENT_MEM_MB" -lt 6000 ]; then
@@ -47,10 +55,20 @@ if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     exit 1
 fi
 
-# Si estamos dentro de la VM de p3, arrancamos el clúster k3d si no está ya arriba.
+if ! k3d cluster list iot-cluster >/dev/null 2>&1; then
+    echo "No se ha creado el clúster k3d 'iot-cluster'. Ejecuta primero 'vagrant up' en p3/ antes." >&2
+    exit 1
+fi
+
+# Arrancamos el clúster k3d si no está ya arriba (puede haberse quedado parado tras un reload).
 k3d cluster start iot-cluster >/dev/null 2>&1 || true
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+
+if [ ! -s "$KUBECONFIG" ]; then
+    echo "No encuentro el kubeconfig de p3 en $KUBECONFIG. Ejecuta primero p3/scripts/install.sh." >&2
+    exit 1
+fi
 
 wait_for_node_ready() {
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
