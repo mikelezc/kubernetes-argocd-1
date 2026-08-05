@@ -115,7 +115,9 @@ wait_for_vm_dns() {
 
 log "Esperando a que el DNS de la VM esté listo..."
 if ! wait_for_vm_dns; then
-    log_warn "El DNS de la VM tarda más de lo normal en responder — se probará igualmente"
+    echo "[ERROR] La VM no tiene salida a Internet. Prueba a recrear p3 con la RAM ya puesta desde el arranque, sin pasar por reload:" >&2
+    echo "        cd p3 && vagrant destroy -f && P3_MEMORY=8192 P3_CPUS=3 vagrant up" >&2
+    exit 1
 fi
 
 banner "1/3 Instalando Helm"

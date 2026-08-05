@@ -20,8 +20,8 @@ Vagrant.configure("2") do |config|
   # K3d + Docker + Argo CD necesitan más recursos que K3s a pelo (p1/p2), por eso
   # el mínimo aquí es mayor, y configurable vía ENV (P3_MEMORY / P3_CPUS) por si hiciera falta más
   # (por ejemplo, para encadenar el bonus con GitLab sobre esta misma VM).
-  memory = (ENV['P3_MEMORY'] || 2048).to_i
-  cpus   = (ENV['P3_CPUS']   || 2).to_i
+  memory = (ENV['P3_MEMORY'] || 8192).to_i	# Si solo decidimos levantar hasta p3, se puede dejar en 2048 
+  cpus   = (ENV['P3_CPUS']   || 3).to_i		# Si solo decidimos levantar hasta p3, se puede dejar en 2
 
   config.vm.provider provider do |v|
     if provider == "vmware_desktop"
