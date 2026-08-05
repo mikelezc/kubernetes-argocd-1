@@ -1,6 +1,6 @@
 #!/bin/bash
 # Limpieza del cluster k3d de p3 y, opcionalmente, del toolbox usado para crearlo.
-#
+
 # Uso:
 #   ./toolbox/reset.sh          # borra el cluster k3d
 #   ./toolbox/reset.sh --deep   # además borra contenedores/volúmenes/red de ese cluster en Docker
@@ -9,9 +9,7 @@
 #                               # publicar la imagen multi-arquitectura (todo se recrea/descarga
 #                               # solo la próxima vez que haga falta; no queda nada huérfano
 #                               # ocupando disco/RAM en la máquina)
-#
-# Cada paso es independiente: si uno falla (por ejemplo, docker no está
-# disponible) el script sigue con el resto en vez de abortar entero.
+
 
 set -uo pipefail
 
