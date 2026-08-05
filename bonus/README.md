@@ -17,7 +17,7 @@ GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado re
 
 1. **GitLab (self-hosted)**: plataforma de Git con interfaz web, equivalente a GitHub pero corriendo en infraestructura propia en vez de en la nube de un tercero. Aquí sustituye a GitHub como la fuente de la verdad que Argo CD vigila.
 
-2. **Helm**: gestor de paquetes para Kubernetes. Un `chart` empaqueta todos los manifiestos que necesita una aplicación compleja (Deployments, Services, Secrets, ConfigMaps...) para instalarla con un solo comando y un fichero de valores (`values.yaml`). Lo usamos porque desplegar GitLab entero (webservice, Redis, PostgreSQL, MinIO, KAS...) a mano sería inviable. De hecho el propio subject lo recomienda explícitamente.
+2. **Helm**: gestor de paquetes para Kubernetes. Un `chart` empaqueta todos los manifiestos que necesita una aplicación compleja (Deployments, Services, Secrets, ConfigMaps...) para instalarla con un solo comando y un fichero de valores (`values.yaml`). Lo usamos porque desplegar GitLab entero (webservice, Redis, PostgreSQL, MinIO, KAS...) a mano sería mucho más complejo.
 
 3. **MinIO**: almacenamiento de objetos compatible con S3 que GitLab usa internamente para adjuntos, artefactos de CI (continuous integration), backups, etc. Hay que inicializar sus buckets "manualmente" tras el despliegue porque el chart de Helm no lo hace por defecto.
 

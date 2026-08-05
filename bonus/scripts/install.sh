@@ -103,6 +103,21 @@ wait_for_minio_endpoint() {
     return 1
 }
 
+wait_for_vm_dns() {
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
+log "Esperando a que el DNS de la VM esté listo..."
+if ! wait_for_vm_dns; then
+    log_warn "El DNS de la VM tarda más de lo normal en responder — se probará igualmente"
+fi
+
 banner "1/3 Instalando Helm"
 
 # Docker/kubectl/k3d ya los instaló p3; aquí solo puede faltar Helm.
