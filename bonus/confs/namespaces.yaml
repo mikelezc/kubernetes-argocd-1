@@ -1,5 +1,4 @@
 # Namespace de GitLab (requerido por el subject).
-# "argocd" y "dev" ya existen gracias a p3, este nuevo ns se instala encima de ese mismo clúster,
 apiVersion: v1
 kind: Namespace
 metadata:
