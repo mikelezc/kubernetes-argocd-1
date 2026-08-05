@@ -9,7 +9,7 @@ SERVER_IP=$1
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} Instalando K3S en modo SERVER...${NC}"
+echo -e "${CYAN} 1/3 Instalando K3S en modo SERVER...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
@@ -19,22 +19,27 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
   --flannel-iface $IFACE" sh -
 
 echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} Esperando a que el clúster inicie correctamente...${NC}"
+echo -e "${CYAN} 2/3 Esperando a que el clúster inicie correctamente...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
+timeout=60
 while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
+  timeout=$((timeout - 2))
+  [ "$timeout" -le 0 ] && { echo "k3s.yaml no apareció a tiempo" >&2; exit 1; }
   sleep 2
 done
 
-# Esperamos a que Traefik y CoreDNS levanten para recibir configuraciones:
-sleep 15
-
-echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} Desplegando las 3 aplicaciones en el clúster...${NC}"
-echo -e "${CYAN}=========================================================${NC}"
-
 # Indicamos a kubectl dónde está el archivo de configuración del clúster k3s
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+# Esperamos a que Traefik se cree (--for=create) y complete su instalación (--for=condition=complete)
+kubectl wait --for=create job/helm-install-traefik -n kube-system --timeout=60s
+kubectl wait --for=condition=complete job/helm-install-traefik -n kube-system --timeout=180s
+kubectl wait --for=condition=available deployment/traefik -n kube-system --timeout=180s
+
+echo -e "${CYAN}=========================================================${NC}"
+echo -e "${CYAN} 3/3 Desplegando las 3 aplicaciones en el clúster...${NC}"
+echo -e "${CYAN}=========================================================${NC}"
 
 # Usamos kubectl para desplegar cada manifesto de aplicación y el manifiesto de Ingress
 kubectl apply -f /vagrant/confs/app1.yaml

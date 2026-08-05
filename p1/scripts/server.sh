@@ -13,7 +13,7 @@ IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 
 echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} Instalando K3S en modo SERVER en mlezcanoS...${NC}"
+echo -e "${CYAN} 1/2 Instalando K3S en modo SERVER en mlezcanoS...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
 # Insatalación del nodo servidor (control plane) de K3s:
@@ -33,7 +33,12 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
 
 # Generamos el token de nodo de K3s para que los nodos worker puedan unirse al clúster.
 echo  -e "${CYAN}Generando token de nodo de K3s...${NC}"
+
+# Protegemos el token de nodo para que solo los nodos worker puedan unirse al clúster.
+timeout=60
 while [ ! -f /var/lib/rancher/k3s/server/node-token ]; do
+  timeout=$((timeout - 2))
+  [ "$timeout" -le 0 ] && { echo "node-token no apareció a tiempo" >&2; exit 1; }
   sleep 2
 done
 
