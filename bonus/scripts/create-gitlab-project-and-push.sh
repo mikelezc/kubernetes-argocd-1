@@ -57,8 +57,10 @@ get_toolbox_pod() {
 
 wait_for_gitlab_ui() {
     banner "1/4 Esperando GitLab disponible en el clúster"
+    log "Esperando el pod de GitLab (puede tardar varios minutos la primera vez)..."
     kubectl -n gitlab wait --for=condition=ready pod \
         -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
+    log "GitLab disponible."
 }
 
 # Nos aseguramos que el proyecto exista en GitLab
@@ -68,7 +70,9 @@ ensure_project() {
 
     toolbox_pod=$(get_toolbox_pod)
     [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
+    log "Pod toolbox: ${toolbox_pod}"
 
+    log "Creando/obteniendo el proyecto..."
     project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-project.rb" 2>/dev/null || true)
 
@@ -78,6 +82,7 @@ ensure_project() {
         echo "Salida: $project_output" >&2
         exit 1
     fi
+    log "Proyecto listo: ${project_repo_url}"
 }
 
 create_gitlab_pat() {
@@ -87,6 +92,7 @@ create_gitlab_pat() {
     toolbox_pod=$(get_toolbox_pod)
     [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
 
+    log "Generando token de acceso a GitLab..."
     pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-pat.rb" 2>/dev/null || true)
 
@@ -100,6 +106,7 @@ create_gitlab_pat() {
     echo "$PAT_TOKEN" > "$PAT_FILE"
     chmod 600 "$PAT_FILE"
     export PAT_TOKEN
+    log "Token guardado en ${PAT_FILE}"
 }
 
 push_to_gitlab() {
@@ -114,6 +121,7 @@ push_to_gitlab() {
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "$WORK_DIR"' EXIT
 
+    log "Preparando repositorio local temporal en ${WORK_DIR}..."
     cp "$MANIFEST_PATH" "$WORK_DIR/deployment.yaml"
 
     cd "$WORK_DIR"
@@ -131,10 +139,12 @@ push_to_gitlab() {
     git remote add origin "$AUTH_URL"
 
     if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+        log "El repositorio ya tiene 'main' — sincronizando antes de pushear..."
         git fetch -q origin main
         git merge -q --allow-unrelated-histories -s ours -m "Sync" origin/main
     fi
 
+    log "Haciendo push a ${PROJECT_REPO_URL_PUSH}..."
     git push -u origin main -q
 }
 
@@ -144,9 +154,9 @@ create_gitlab_pat
 push_to_gitlab
 
 echo ""
-echo "============================================================"
-echo "  Repositorio GitLab listo"
-echo "============================================================"
+echo -e "${CYAN}============================================================${NC}"
+echo -e "${CYAN}  Repositorio GitLab listo${NC}"
+echo -e "${CYAN}============================================================${NC}"
 echo ""
 echo "  URL:      http://gitlab.localhost:8080/${PROJECT_FULL_PATH}"
 echo "  rama:     main"
