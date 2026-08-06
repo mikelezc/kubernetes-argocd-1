@@ -45,7 +45,7 @@ if ! kubectl -n argocd get application iot-app >/dev/null 2>&1; then
     exit 1
 fi
 
-GITLAB_CLUSTER_BASE_URL="http://gitlab-webservice-default.gitlab.svc:8181"
+GITLAB_CLUSTER_BASE_URL="http://gitlab.gitlab.svc"
 PROJECT_FULL_PATH="root/mlezcano-gitlab-demo"
 ARGO_REPO_URL="${GITLAB_CLUSTER_BASE_URL}/${PROJECT_FULL_PATH}.git"
 
