@@ -36,7 +36,7 @@ fi
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
 # Este script asume GitLab ya instalado; si no, fallará aquí con un
-# mensaje claro. Mejor que dejar que falle más abajo buscando el pod toolbox.
+# mensaje claro. Mejor que dejar que falle más abajo buscando el pod de GitLab.
 if ! kubectl get ns gitlab >/dev/null 2>&1; then
     echo "GitLab no está instalado (no existe el namespace 'gitlab'). Ejecuta primero ./scripts/install.sh." >&2
     exit 1
@@ -50,30 +50,29 @@ PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
 PROJECT_REPO_URL_PUSH="${GITLAB_VM_URL}/${PROJECT_FULL_PATH}.git"
 GITLAB_PAT_NAME="mlezcano-argo"
 
-# toolbox sirve para ejecutar comandos dentro del contenedor de GitLab, como crear proyectos y tokens
-get_toolbox_pod() {
-    kubectl -n gitlab get pods -o name | grep '/gitlab-toolbox' | head -n 1 | cut -d/ -f2
+get_gitlab_pod() {
+    kubectl -n gitlab get pod -l app=gitlab -o jsonpath='{.items[0].metadata.name}'
 }
 
 wait_for_gitlab_ui() {
     banner "1/4 Esperando GitLab disponible en el clúster"
     log "Esperando el pod de GitLab (puede tardar varios minutos la primera vez)..."
     kubectl -n gitlab wait --for=condition=ready pod \
-        -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
+        -l app=gitlab --timeout=900s >/dev/null 2>&1 || true
     log "GitLab disponible."
 }
 
 # Nos aseguramos que el proyecto exista en GitLab
 ensure_project() {
-    local toolbox_pod project_output project_repo_url
+    local gitlab_pod project_output project_repo_url
     banner "2/4 Creando el proyecto '${PROJECT_PATH}' en GitLab"
 
-    toolbox_pod=$(get_toolbox_pod)
-    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
-    log "Pod toolbox: ${toolbox_pod}"
+    gitlab_pod=$(get_gitlab_pod)
+    [ -z "$gitlab_pod" ] && { echo "No encuentro el pod de GitLab." >&2; exit 1; }
+    log "Pod de GitLab: ${gitlab_pod}"
 
     log "Creando/obteniendo el proyecto..."
-    project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
+    project_output=$(kubectl exec -i -n gitlab -c gitlab "$gitlab_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-project.rb" 2>/dev/null || true)
 
     project_repo_url=$(printf '%s\n' "$project_output" | tail -n 1 | tr -d '\r')
@@ -86,14 +85,14 @@ ensure_project() {
 }
 
 create_gitlab_pat() {
-    local toolbox_pod pat_output
+    local gitlab_pod pat_output
     banner "3/4 Creando Personal Access Token '${GITLAB_PAT_NAME}'"
 
-    toolbox_pod=$(get_toolbox_pod)
-    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
+    gitlab_pod=$(get_gitlab_pod)
+    [ -z "$gitlab_pod" ] && { echo "No encuentro el pod de GitLab." >&2; exit 1; }
 
     log "Generando token de acceso a GitLab..."
-    pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
+    pat_output=$(kubectl exec -i -n gitlab -c gitlab "$gitlab_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-pat.rb" 2>/dev/null || true)
 
     PAT_TOKEN=$(printf '%s\n' "$pat_output" | tail -n 1 | tr -d '\r')
