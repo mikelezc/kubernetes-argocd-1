@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-data
+  namespace: gitlab
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: gitlab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      containers:
+      - name: gitlab
+        image: gitlab/gitlab-ce:19.2.1-ce.0
+        ports:
+        - name: http
+          containerPort: 80
+        env:
+        # Configuración "mega-ligera":
+        #  Desactivamos Prometheus, exporters, Container Registry, KAS
+        - name: GITLAB_OMNIBUS_CONFIG
+          value: |
+            # Sin puerto: el ":8080" es solo cómo Vagrant/k3d lo publican hacia
+            # el host (forwarded_port); si lo incluimos aquí, Omnibus reconfigura
+            # tanto nginx como Puma para escuchar en 8080 y chocan entre sí
+            # (Puma revienta con "Address already in use").
+            external_url 'http://gitlab.localhost'
+            prometheus_monitoring['enable'] = false
+            alertmanager['enable'] = false
+            node_exporter['enable'] = false
+            redis_exporter['enable'] = false
+            postgres_exporter['enable'] = false
+            gitlab_exporter['enable'] = false
+            registry['enable'] = false
+            gitlab_kas['enable'] = false
+        volumeMounts:
+        - name: gitlab-data
+          mountPath: /etc/gitlab
+          subPath: config
+        - name: gitlab-data
+          mountPath: /var/opt/gitlab
+          subPath: data
+        - name: gitlab-data
+          mountPath: /var/log/gitlab
+          subPath: logs
+
+        readinessProbe:
+          exec:
+            command: ["/opt/gitlab/embedded/bin/curl", "-fsS", "http://localhost/-/readiness"]
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          failureThreshold: 20
+      volumes:
+      - name: gitlab-data
+        persistentVolumeClaim:
+          claimName: gitlab-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: gitlab
+spec:
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    app: gitlab
+---
+# Expone GitLab por HTTP a través de Traefik, igual que argocd-ingress.yaml en p3.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitlab-ingress
+  namespace: gitlab
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: gitlab.localhost
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gitlab
+            port:
+              number: 80

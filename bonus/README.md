@@ -17,17 +17,15 @@ GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado re
 
 1. **GitLab (self-hosted)**: plataforma de Git con interfaz web, equivalente a GitHub pero corriendo en infraestructura propia en vez de en la nube de un tercero. Aquí sustituye a GitHub como la fuente de la verdad que Argo CD vigila.
 
-2. **Helm**: gestor de paquetes para Kubernetes. Un `chart` empaqueta todos los manifiestos que necesita una aplicación compleja (Deployments, Services, Secrets, ConfigMaps...) para instalarla con un solo comando y un fichero de valores (`values.yaml`). Lo usamos porque desplegar GitLab entero a mano sería mucho más complejo.
+2. **Por qué Omnibus y no el chart de Helm "cloud-native"**: el subject exige explícitamente la última versión disponible de GitLab. Desde GitLab 19.0, el chart de Helm (`gitlab/gitlab`) **eliminó** PostgreSQL/Redis/MinIO empaquetados y exige montarlos como servicios externos (CloudNativePG, Valkey, Garage). La imagen **Omnibus** (`gitlab/gitlab-ce`) es la otra distribución oficial de GitLab: un único contenedor con todo embebido (Postgres, Redis, Gitaly, Puma, Sidekiq...), se sigue publicando en cada versión (incluida la última, 19.2.1) y no necesita nada externo. Por eso este bonus despliega un `Deployment` normal (`confs/gitlab.yaml`) en vez de un chart de Helm.
 
-3. **MinIO**: almacenamiento de objetos compatible con S3 que GitLab usa internamente para adjuntos, artefactos de CI (continuous integration), backups, etc. Hay que inicializar sus buckets "manualmente" tras el despliegue porque el chart de Helm no lo hace por defecto.
-
-4. **Por qué bonus comparte el clúster de p3 en vez de tener uno propio**: el DNS interno de GitLab (`gitlab-webservice-default.gitlab.svc`) solo resuelve dentro de su propio clúster, si Argo CD viviera en un clúster distinto, no podría resolverlo sin depender de soluciones demasiado frágiles. 
+3. **Por qué bonus comparte el clúster de p3 en vez de tener uno propio**: el DNS interno de GitLab (`gitlab.gitlab.svc`) solo resuelve dentro de su propio clúster; si Argo CD viviera en un clúster distinto, no podría resolverlo sin depender de soluciones demasiado frágiles.
 
 Como **p3 corre dentro de su propia VM de Vagrant** (ver `p3/README.md`), instalar GitLab en ese mismo clúster resuelve esto de raíz: todo comparte el mismo DNS interno, y no hace falta duplicar Argo CD ni el clúster.
 
-5. **Namespaces**: `gitlab` (lo crea este bonus), `argocd` y `dev` ya existen, previamente creados por p3.
+4. **Namespaces**: `gitlab` (lo crea este bonus), `argocd` y `dev` ya existen, previamente creados por p3.
 
-6. **Bootstrap en cuatro scripts para entender el funcionamiento del despliegue**:
+5. **Bootstrap en cuatro scripts para entender el funcionamiento del despliegue**:
 
 	- `install.sh` redimensiona la VM de p3 si hace falta, y despliega GitLab (Argo CD y el clúster ya los puso p3).
 	- `create-gitlab-project-and-push.sh` crea el proyecto en GitLab vía su API y sube el manifiesto inicial.
@@ -50,26 +48,24 @@ Como **p3 corre dentro de su propia VM de Vagrant** (ver `p3/README.md`), instal
 
 ## Contenido de la carpeta
 
-1. [confs/gitlab-values.yaml](confs/gitlab-values.yaml): valores de Helm para el despliegue reducido de GitLab (qué componentes activar/desactivar, recursos, etc.).
+1. [confs/gitlab.yaml](confs/gitlab.yaml): `PersistentVolumeClaim` + `Deployment` + `Service` + `Ingress` de GitLab Omnibus (imagen oficial monolítica, sin Helm). Incluye el `GITLAB_OMNIBUS_CONFIG` que desactiva lo que este laboratorio no usa (Prometheus, exporters, Container Registry, KAS).
 
 2. [confs/deployment.yaml](confs/deployment.yaml): manifiesto inicial de la app. Se usa **una sola vez**, para sembrar el repositorio en GitLab (`create-gitlab-project-and-push.sh` lo sube en el primer push).
 A partir de ahí, la versión que Argo CD vigila de verdad vive dentro de GitLab, y los cambios se hacen en su UI, no en este fichero.
 
 3. [confs/argocd-application.yaml](confs/argocd-application.yaml): mismo nombre/namespace/destino que `p3/confs/argocd.yaml` (`iot-app`/`argocd`/`dev`). Aplicarlo no crea una `Application` nueva, parchea en sitio la que ya existe, cambiando solo su `repoURL` de GitHub a GitLab.
 
-4. [confs/gitlab-create-project.rb](confs/gitlab-create-project.rb) y [confs/gitlab-create-pat.rb](confs/gitlab-create-pat.rb): scripts de Ruby que `create-gitlab-project-and-push.sh` ejecuta dentro del pod `toolbox` de GitLab (vía `gitlab-rails runner`) para crear el proyecto inicial y su token de acceso, sin depender de credenciales previas.
+4. [confs/gitlab-create-project.rb](confs/gitlab-create-project.rb) y [confs/gitlab-create-pat.rb](confs/gitlab-create-pat.rb): scripts de Ruby que `create-gitlab-project-and-push.sh` ejecuta dentro del propio pod de GitLab (vía `gitlab-rails runner`) para crear el proyecto inicial y su token de acceso, sin depender de credenciales previas.
 
 5. [confs/namespaces.yaml](confs/namespaces.yaml): el namespace `gitlab` (`argocd`/`dev` ya existen gracias a p3).
 
-6. [confs/minio-init-buckets.sh](confs/minio-init-buckets.sh): script que crea los buckets que necesita GitLab en MinIO. `install.sh` lo ejecuta dentro de un pod `mc` de usar y tirar, pasándole las credenciales como variables de entorno (para no interpolarlas en el propio script).
+6. [scripts/install.sh](scripts/install.sh): redimensiona la VM de p3 (`vagrant reload`) si hace falta y despliega GitLab (`confs/gitlab.yaml`) encima del clúster ya existente.
 
-7. [scripts/install.sh](scripts/install.sh): redimensiona la VM de p3 (`vagrant reload`) si hace falta y despliega GitLab encima del clúster ya existente.
+7. [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea el proyecto en GitLab vía su API y sube `confs/deployment.yaml`.
 
-8. [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea el proyecto en GitLab vía su API y sube `confs/deployment.yaml`.
+8. [scripts/connect-argocd-to-gitlab.sh](scripts/connect-argocd-to-gitlab.sh): re-apunta `iot-app` de GitHub a este repositorio de GitLab.
 
-9. [scripts/connect-argocd-to-gitlab.sh](scripts/connect-argocd-to-gitlab.sh): re-apunta `iot-app` de GitHub a este repositorio de GitLab.
-
-10. [scripts/revert-to-github.sh](scripts/revert-to-github.sh): vuelve a apuntar `iot-app` a GitHub (`p3/confs/argocd.yaml`), para demostrar el swap en ambos sentidos.
+9. [scripts/revert-to-github.sh](scripts/revert-to-github.sh): vuelve a apuntar `iot-app` a GitHub (`p3/confs/argocd.yaml`), para demostrar el swap en ambos sentidos.
 
 ---
 
@@ -93,7 +89,7 @@ Este script detecta que no hay kubeconfig local y entra en la VM de p3 (`vagrant
 
 Antes de instalar nada comprueba la RAM real de esa VM: si no llega a lo que necesita GitLab, la redimensiona (`P3_MEMORY=8192 P3_CPUS=3 vagrant reload`, esto reinicia la VM, tarda un poco). 
 
-Si ya está al tamaño correcto, se lo salta. Ya dentro, instala GitLab (namespace `gitlab`) vía Helm e inicializa sus buckets de MinIO. Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
+Si ya está al tamaño correcto, se lo salta. Ya dentro, despliega GitLab (namespace `gitlab`, imagen Omnibus) y espera a que termine su primer arranque (migra la base de datos embebida, compila assets... varios minutos). Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
 
 ---
 
@@ -172,7 +168,7 @@ Para volver a GitHub en cualquier momento (y demostrar el swap en los dos sentid
    kubectl -n argocd get application iot-app -o jsonpath='{.spec.source.repoURL}'; echo
    ```
 
-   Debe mostrar la URL interna de GitLab (`http://gitlab-webservice-default.gitlab.svc:8181/...`), no la de GitHub.
+   Debe mostrar la URL interna de GitLab (`http://gitlab.gitlab.svc/...`), no la de GitHub.
 
 ---
 
@@ -193,10 +189,10 @@ Para volver a GitHub en cualquier momento (y demostrar el swap en los dos sentid
 
    Entramos en `http://gitlab.localhost:8080/root/mlezcano-gitlab-demo` con el usuario `root` y la contraseña impresa por `install.sh`.
 
-   *En caso de haberla "perdido" en la terminal, podemos recuperarla dentro de la VM con el mismo comando ya usado en p3:*
+   *En caso de haberla "perdido" en la terminal, podemos recuperarla dentro de la VM leyendo el fichero que Omnibus genera en el primer arranque (no es un Secret de k8s, a diferencia de p3):*
 
    ```bash
-   kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d && printf "\n"
+   kubectl -n gitlab exec deploy/gitlab -- grep '^Password:' /etc/gitlab/initial_root_password
    ```
 
 ---

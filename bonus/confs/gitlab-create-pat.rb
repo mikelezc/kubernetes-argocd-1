@@ -1,5 +1,5 @@
 # Crea un Personal Access Token de lectura/escritura para que Argo CD pueda autenticarse contra el repositorio. 
-# Se ejecuta dentro del pod toolbox de GitLab vía `gitlab-rails runner`
+# Se ejecuta dentro del pod de GitLab vía `gitlab-rails runner`
 user = User.find_by_username('root')
 user.personal_access_tokens.where(name: 'mlezcano-argo').delete_all
 

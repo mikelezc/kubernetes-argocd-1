@@ -16,7 +16,6 @@ log() {
     printf '\n%b==> %s%b\n' "$CYAN" "$1" "$NC"
 }
 
-log_ok()   { log "[OK] $1"; }
 log_warn() { echo "[WARN] $1" >&2; }
 
 banner() {
@@ -92,17 +91,6 @@ else
     CONFS_DIR="$BONUS_ROOT/confs"
 fi
 
-wait_for_minio_endpoint() {
-    for _ in 1 2 3 4 5 6; do
-        if kubectl -n gitlab get endpoints gitlab-minio-svc \
-            -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then
-            return 0
-        fi
-        sleep 2
-    done
-    return 1
-}
-
 wait_for_vm_dns() {
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         if getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
@@ -120,91 +108,31 @@ if ! wait_for_vm_dns; then
     exit 1
 fi
 
-banner "1/3 Instalando Helm"
+banner "1/2 Desplegando GitLab (imagen oficial Omnibus)"
 
-# Docker/kubectl/k3d ya los instaló p3; aquí solo puede faltar Helm.
-if ! command -v helm &>/dev/null; then
-    curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | sudo bash
-fi
-
+# Sin Helm ni chart: GitLab Omnibus es un único contenedor con todo embebido
+# (Postgres/Redis/Gitaly/Puma/Sidekiq), así que namespace + Deployment bastan.
 kubectl apply -f "$CONFS_DIR/namespaces.yaml"
+kubectl apply -f "$CONFS_DIR/gitlab.yaml"
 
-banner "2/3 Instalando GitLab"
-
-helm repo add gitlab https://charts.gitlab.io/ && helm repo update
-
-VALUES_PATH="$CONFS_DIR/gitlab-values.yaml"
-
-MINIO_ARCH_ARGS=()
-case "$(uname -m)" in
-    aarch64|arm64)
-        MINIO_ARCH_ARGS=(
-            --set "minio.imageTag=RELEASE.2020-09-21T22-31-59Z-arm64"
-            --set "minio.minioMc.tag=RELEASE.2020-09-23T20-02-13Z-arm64"
-        )
-        MC_IMAGE="registry.gitlab.com/gitlab-org/cloud-native/mirror/images/minio/mc:RELEASE.2020-09-23T20-02-13Z-arm64"
-        ;;
-    *)
-        MC_IMAGE="minio/mc:RELEASE.2018-07-13T00-53-22Z"
-        ;;
-esac
-
-if ! helm upgrade --install gitlab gitlab/gitlab \
-    --version 9.9.0 \
-    --timeout 600s \
-    --namespace gitlab \
-    -f "$VALUES_PATH" \
-    "${MINIO_ARCH_ARGS[@]}"; then
-    echo "Error: GitLab no se pudo instalar con Helm." >&2
+log "Esperando a que GitLab termine su primer arranque (reconfigure + migraciones, ~15 minutos)..."
+if ! kubectl -n gitlab rollout status deployment/gitlab --timeout=1200s; then
+    echo "Error: GitLab no llegó a estar listo a tiempo. Revisa 'kubectl -n gitlab logs deploy/gitlab'." >&2
     exit 1
 fi
 
-log "Esperando pod MinIO..."
-kubectl -n gitlab wait --for=condition=ready pod \
-    -l app=minio,release=gitlab --timeout=300s 2>/dev/null \
-    || log_warn "MinIO tarda más de lo normal"
+GITLAB_POD="$(kubectl -n gitlab get pod -l app=gitlab -o jsonpath='{.items[0].metadata.name}')"
 
-if wait_for_minio_endpoint; then
-    log_ok "MinIO responde en su endpoint"
-else
-    log_warn "MinIO aún no expone el endpoint — se probará igualmente"
-fi
+banner "2/2 Contraseña inicial de GitLab"
 
-kubectl -n gitlab delete job -l app=minio,release=gitlab --ignore-not-found >/dev/null 2>&1
-
-log "Inicializando buckets MinIO..."
-ACCESS_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
-    -o jsonpath="{.data.accesskey}" | base64 -d 2>/dev/null || echo "minioadmin")
-SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
-    -o jsonpath="{.data.secretkey}" | base64 -d 2>/dev/null || echo "minioadmin")
-
-for attempt in 1 2 3; do
-    if kubectl -n gitlab run mc-init --rm -i --restart=Never \
-        --image="$MC_IMAGE" \
-        --env="ACCESS_KEY=$ACCESS_KEY" \
-        --env="SECRET_KEY=$SECRET_KEY" \
-        --command -- /bin/sh < "$CONFS_DIR/minio-init-buckets.sh" >/dev/null 2>&1; then
-        break
-    fi
-    [ "$attempt" -lt 3 ] && { log_warn "MinIO aún arrancando, reintentando..."; sleep 3; continue; }
-    log_warn "No se pudo inicializar MinIO tras varios intentos"
-done
-
-banner "3/3 Contraseña inicial de GitLab"
-
-ROOT_SECRET="gitlab-gitlab-initial-root-password"
-log "Esperando secret con contraseña root de GitLab..."
-for _ in $(seq 1 24); do
-    kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1 && break
+log "Esperando el fichero con la contraseña root..."
+DECODED=""
+for _ in $(seq 1 12); do
+    DECODED=$(kubectl -n gitlab exec "$GITLAB_POD" -- \
+        grep '^Password:' /etc/gitlab/initial_root_password 2>/dev/null | awk '{print $2}')
+    [ -n "$DECODED" ] && break
     sleep 5
 done
-
-DECODED=""
-if kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1; then
-    ENCODED=$(kubectl -n gitlab get secret "$ROOT_SECRET" \
-        -o jsonpath='{.data.password}' 2>/dev/null || true)
-    DECODED=$(echo "$ENCODED" | base64 -d 2>/dev/null || true)
-fi
 
 echo ""
 echo -e "${CYAN}============================================================${NC}"
@@ -217,8 +145,7 @@ echo "  usuario:    root"
 if [ -n "$DECODED" ]; then
     echo "  contraseña: $DECODED"
 else
-    echo "  contraseña: kubectl -n gitlab get secret gitlab-gitlab-initial-root-password \\"
-    echo "               -o jsonpath='{.data.password}' | base64 -d"
+    echo "  contraseña: kubectl -n gitlab exec deploy/gitlab -- grep '^Password:' /etc/gitlab/initial_root_password"
 fi
 echo ""
 echo "Argo CD (:8080) y la app (:8888) ya estaban arriba gracias a p3."
