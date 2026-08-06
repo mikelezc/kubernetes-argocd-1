@@ -1,5 +1,5 @@
 # Crea el proyecto 'mlezcano-gitlab-demo' bajo el usuario root si no existe.
-# Se ejecuta dentro del pod toolbox de GitLab vía `gitlab-rails runner`
+# Se ejecuta dentro del pod de GitLab vía `gitlab-rails runner`
 user = User.find_by_username('root')
 project = Project.find_by_full_path('root/mlezcano-gitlab-demo')
 
