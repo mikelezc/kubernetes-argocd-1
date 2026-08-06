@@ -1,42 +1,74 @@
 #!/bin/bash
 
-set -e
-
-# Este script asume que p3/ ya se ha levantado con "vagrant up",
+# Antes de ejecutar este script, p3 debe estar ya desplegado.
 # solo añadimos GitLab encima, en el mismo clúster.
+
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"
 
+log() {
+    printf '\n%b==> %s%b\n' "$CYAN" "$1" "$NC"
+}
+
+log_ok()   { log "[OK] $1"; }
+log_warn() { echo "[WARN] $1" >&2; }
+
+banner() {
+    echo -e "${CYAN}=========================================================${NC}"
+    echo -e "${CYAN} $1${NC}"
+    echo -e "${CYAN}=========================================================${NC}"
+}
+
 # Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
-# Antes de entrar, redimensionamos la VM (GitLab necesita bastante más RAM que p3 solo) — esto implica un "vagrant reload"
+# Antes de entrar, redimensionamos la VM ya que GitLab necesita más RAM que en p3 (implica un "vagrant reload").
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
     if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
         cd "$P3_ROOT"
+
+        # Comprobamos que la VM de p3 está realmente arriba.
+        P3_STATE="$(vagrant status --machine-readable 2>/dev/null | awk -F, '$3 == "state" {print $4}')"
+        if [ "$P3_STATE" != "running" ]; then
+            echo "La VM de p3 no está levantada (estado: ${P3_STATE:-no creada}). Ejecuta 'vagrant up' desde p3/ antes de instalar el bonus." >&2
+            exit 1
+        fi
+
         # Comprobamos la RAM real de la VM antes de decidir si hace falta redimensionarla.
         CURRENT_MEM_MB="$(vagrant ssh -c "free -m | awk '/Mem:/ {print \$2}'" 2>/dev/null | tr -d '\r' | tail -n1)"
         if [ -z "$CURRENT_MEM_MB" ] || [ "$CURRENT_MEM_MB" -lt 6000 ]; then
-            echo "Redimensionando la VM de p3 para dar cabida a GitLab (P3_MEMORY=8192, P3_CPUS=3)..."
+            log "Redimensionando la VM de p3 para dar cabida a GitLab (P3_MEMORY=8192, P3_CPUS=3)..."
             P3_MEMORY=8192 P3_CPUS=3 vagrant reload
         else
-            echo "La VM de p3 ya tiene RAM suficiente (${CURRENT_MEM_MB}MB) — no hace falta redimensionar."
+            log "La VM de p3 ya tiene RAM suficiente (${CURRENT_MEM_MB}MB) — no hace falta redimensionar."
         fi
         BONUS_INSIDE_VM=1 vagrant ssh -c \
             'cd /vagrant && BONUS_INSIDE_VM=1 bash /bonus/scripts/install.sh'
         exit $?
     fi
-    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/."
+    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/." >&2
     exit 1
 fi
 
-# El "vagrant reload" reinicia la VM entera, según la política de reinicio de
-# los contenedores, el clúster k3d puede no volver solo,
-# esperamos a que el nodo esté listo antes de aplicar nada.
+if ! k3d cluster list iot-cluster >/dev/null 2>&1; then
+    echo "No se ha creado el clúster k3d 'iot-cluster'. Ejecuta primero 'vagrant up' en p3/ antes." >&2
+    exit 1
+fi
+
+# Arrancamos el clúster k3d si no está ya arriba (puede haberse quedado parado tras un reload).
 k3d cluster start iot-cluster >/dev/null 2>&1 || true
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
+
+if [ ! -s "$KUBECONFIG" ]; then
+    echo "No encuentro el kubeconfig de p3 en $KUBECONFIG. Ejecuta primero p3/scripts/install.sh." >&2
+    exit 1
+fi
 
 wait_for_node_ready() {
     for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
@@ -48,9 +80,9 @@ wait_for_node_ready() {
     return 1
 }
 
-echo "Esperando a que el nodo esté listo..."
+log "Esperando a que el nodo esté listo..."
 if ! wait_for_node_ready; then
-    echo "[WARN] El nodo tarda más de lo normal en responder — se probará igualmente"
+    log_warn "El nodo tarda más de lo normal en responder — se probará igualmente"
 fi
 
 # Acceso a bonus/confs desde dentro de la VM de p3 (montado en p3/Vagrantfile)
@@ -59,16 +91,6 @@ if [ -d "/bonus/confs" ]; then
 else
     CONFS_DIR="$BONUS_ROOT/confs"
 fi
-
-log_section() {
-    echo ""
-    echo "========================================================="
-    echo " $1"
-    echo "========================================================="
-}
-
-log_ok()   { echo "[OK]   $1"; }
-log_warn() { echo "[WARN] $1"; }
 
 wait_for_minio_endpoint() {
     for _ in 1 2 3 4 5 6; do
@@ -81,9 +103,24 @@ wait_for_minio_endpoint() {
     return 1
 }
 
-# -------------------------------------------------------
-log_section "1/3 — Herramientas (Helm)"
-# -------------------------------------------------------
+wait_for_vm_dns() {
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
+log "Esperando a que el DNS de la VM esté listo..."
+if ! wait_for_vm_dns; then
+    echo "[ERROR] La VM no tiene salida a Internet. Prueba a recrear p3 con la RAM ya puesta desde el arranque, sin pasar por reload:" >&2
+    echo "        cd p3 && vagrant destroy -f && P3_MEMORY=8192 P3_CPUS=3 vagrant up" >&2
+    exit 1
+fi
+
+banner "1/3 Instalando Helm"
 
 # Docker/kubectl/k3d ya los instaló p3; aquí solo puede faltar Helm.
 if ! command -v helm &>/dev/null; then
@@ -92,9 +129,7 @@ fi
 
 kubectl apply -f "$CONFS_DIR/namespaces.yaml"
 
-# -------------------------------------------------------
-log_section "2/3 — GitLab (Helm chart 9.9.0)"
-# -------------------------------------------------------
+banner "2/3 Instalando GitLab"
 
 helm repo add gitlab https://charts.gitlab.io/ && helm repo update
 
@@ -120,11 +155,11 @@ if ! helm upgrade --install gitlab gitlab/gitlab \
     --namespace gitlab \
     -f "$VALUES_PATH" \
     "${MINIO_ARCH_ARGS[@]}"; then
-    echo "Error: GitLab no se pudo instalar con Helm."
+    echo "Error: GitLab no se pudo instalar con Helm." >&2
     exit 1
 fi
 
-echo "Esperando pod MinIO..."
+log "Esperando pod MinIO..."
 kubectl -n gitlab wait --for=condition=ready pod \
     -l app=minio,release=gitlab --timeout=300s 2>/dev/null \
     || log_warn "MinIO tarda más de lo normal"
@@ -137,7 +172,7 @@ fi
 
 kubectl -n gitlab delete job -l app=minio,release=gitlab --ignore-not-found >/dev/null 2>&1
 
-echo "Inicializando buckets MinIO..."
+log "Inicializando buckets MinIO..."
 ACCESS_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
     -o jsonpath="{.data.accesskey}" | base64 -d 2>/dev/null || echo "minioadmin")
 SECRET_KEY=$(kubectl -n gitlab get secret gitlab-minio-secret \
@@ -155,12 +190,10 @@ for attempt in 1 2 3; do
     log_warn "No se pudo inicializar MinIO tras varios intentos"
 done
 
-# -------------------------------------------------------
-log_section "3/3 — Contraseña inicial de GitLab"
-# -------------------------------------------------------
+banner "3/3 Contraseña inicial de GitLab"
 
 ROOT_SECRET="gitlab-gitlab-initial-root-password"
-echo "Esperando secret con contraseña root de GitLab..."
+log "Esperando secret con contraseña root de GitLab..."
 for _ in $(seq 1 24); do
     kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1 && break
     sleep 5
@@ -174,9 +207,9 @@ if kubectl -n gitlab get secret "$ROOT_SECRET" >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "============================================================"
-echo "=================== GitLab instalado ======================"
-echo "============================================================"
+echo -e "${CYAN}============================================================${NC}"
+echo -e "${CYAN}=================== GitLab instalado ======================${NC}"
+echo -e "${CYAN}============================================================${NC}"
 echo ""
 echo "GitLab:    http://gitlab.localhost:8080"
 echo ""

@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: app2
 spec:
-  replicas: 3 # <-- ¡IMPORTANTE! El Subject pide 3 réplicas para la App 2
+  replicas: 3   # El Subject pide 3 réplicas para la App 2
   selector:
     matchLabels:
       app: app2
@@ -15,6 +15,9 @@ spec:
       containers:
       - name: nginx-app2
         image: nginx:alpine
+        # Downward API: exponemos metadata del propio Pod como env vars, para que la
+        # página muestre en qué pod/IP/nodo real se ha servido cada petición (útil
+        # aquí para comprobar que las 3 réplicas reparten las peticiones).
         env:
         - name: POD_NAME
           valueFrom:
@@ -28,6 +31,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        # Generamos el index.html al arrancar con un heredoc en vez de construir una
+        # imagen Docker propia: reutilizamos nginx:alpine genérico, sin publicar nada.
         command:
         - /bin/sh
         - -c

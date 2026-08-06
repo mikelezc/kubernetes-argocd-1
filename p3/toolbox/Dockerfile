@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git jq \
     && rm -rf /var/lib/apt/lists/*
 
-# Cliente Docker (sin daemon: el daemon real es el del host, vía el socket montado en run.sh)
+# Instalamos Docker
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
@@ -17,7 +17,7 @@ RUN set -eux; \
     mv /tmp/docker/docker /usr/local/bin/docker; \
     rm -rf /tmp/docker /tmp/docker.tgz
 
-# kubectl (mismo mecanismo que usa p3/scripts/install.sh)
+# Instalamos kubectl
 RUN set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
@@ -29,7 +29,7 @@ RUN set -eux; \
       "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${k8s_arch}/kubectl"; \
     chmod +x /usr/local/bin/kubectl
 
-# k3d
+# Instalamos k3d
 RUN curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
 WORKDIR /workspace

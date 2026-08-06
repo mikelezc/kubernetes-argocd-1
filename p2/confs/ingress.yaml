@@ -1,6 +1,7 @@
-# Este archivo es el responsable de redirigir el tráfico según el HOST a las aplicaciones correspondientes.
+# Ingress: recurso nativo de K8s para definir reglas de enrutamiento,
+# HTTP/HTTPS entrante hacia los servicios del clúster.
 apiVersion: networking.k8s.io/v1
-kind: Ingress
+kind: Ingress 
 metadata:
   name: iot-ingress
 spec:
@@ -27,8 +28,8 @@ spec:
             name: app2
             port:
               number: 80
-  # El "Otherwise, app3 will be selected by default".
-  # Al no poner 'host', Traefik entiende que esto es el comodín (*) para todo el tráfico no coincidente.
+  # Subject: "Otherwise, app3 will be selected by default".
+  # Al no poner 'host', Traefik entiende que esto es el "catch-all" y redirige el tráfico a app3.
   - http:
       paths:
       - path: /

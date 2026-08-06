@@ -1,4 +1,5 @@
-# Manifiesto que despliega la aplicación de ejemplo en el cluster k3d+
+# Manifiesto que se commitea al repositorio de GitLab para que Argo CD,
+# despliegue la aplicación "playground" en el namespace "dev" del cluster.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

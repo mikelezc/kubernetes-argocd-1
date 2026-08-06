@@ -1,11 +1,24 @@
 #!/bin/bash
 
+CYAN='\033[0;36m'
+NC='\033[0m'
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"	# Directorio del script
 BONUS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"				# Directorio raíz del proyecto
 KUBECONFIG_DEFAULT="/home/vagrant/.kube/config"				# Path por defecto del kubeconfig dentro de la VM
-PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab, generado por create-gitlab-project-and-push.sh
+PAT_FILE="/tmp/.gitlab-pat"									# Path del token de acceso personal (PAT) de GitLab
+
+log() {
+    printf '\n%b==> %s%b\n' "$CYAN" "$1" "$NC"
+}
+
+banner() {
+    echo -e "${CYAN}=========================================================${NC}"
+    echo -e "${CYAN} $1${NC}"
+    echo -e "${CYAN}=========================================================${NC}"
+}
 
 # Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
@@ -16,11 +29,18 @@ if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
             'cd /vagrant && BONUS_INSIDE_VM=1 bash /bonus/scripts/create-gitlab-project-and-push.sh'
         exit $?
     fi
-    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/ y luego ./scripts/install.sh desde bonus/."
+    echo "No encuentro el kubeconfig de p3. Ejecuta primero 'vagrant up' desde p3/ y luego ./scripts/install.sh desde bonus/." >&2
     exit 1
 fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
+
+# Este script asume GitLab ya instalado; si no, fallará aquí con un
+# mensaje claro. Mejor que dejar que falle más abajo buscando el pod toolbox.
+if ! kubectl get ns gitlab >/dev/null 2>&1; then
+    echo "GitLab no está instalado (no existe el namespace 'gitlab'). Ejecuta primero ./scripts/install.sh." >&2
+    exit 1
+fi
 
 # El loadbalancer de k3d lo publica p3 en el puerto 8080 de la VM
 GITLAB_VM_URL="http://gitlab.localhost:8080"
@@ -30,60 +50,67 @@ PROJECT_FULL_PATH="${PROJECT_NAMESPACE}/${PROJECT_PATH}"
 PROJECT_REPO_URL_PUSH="${GITLAB_VM_URL}/${PROJECT_FULL_PATH}.git"
 GITLAB_PAT_NAME="mlezcano-argo"
 
-log() { echo "[$1] $2"; }
-
 # toolbox sirve para ejecutar comandos dentro del contenedor de GitLab, como crear proyectos y tokens
 get_toolbox_pod() {
     kubectl -n gitlab get pods -o name | grep '/gitlab-toolbox' | head -n 1 | cut -d/ -f2
 }
 
 wait_for_gitlab_ui() {
-    log "1/4" "Esperando GitLab disponible en el clúster..."
+    banner "1/4 Esperando GitLab disponible en el clúster"
+    log "Esperando el pod de GitLab (puede tardar varios minutos la primera vez)..."
     kubectl -n gitlab wait --for=condition=ready pod \
         -l app=webservice,release=gitlab --timeout=900s >/dev/null 2>&1 || true
+    log "GitLab disponible."
 }
 
-# Asegura que el proyecto exista en GitLab
+# Nos aseguramos que el proyecto exista en GitLab
 ensure_project() {
     local toolbox_pod project_output project_repo_url
-    toolbox_pod=$(get_toolbox_pod)
-    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab."; exit 1; }
+    banner "2/4 Creando el proyecto '${PROJECT_PATH}' en GitLab"
 
-    log "2/4" "Creando proyecto '${PROJECT_PATH}' en GitLab..."
+    toolbox_pod=$(get_toolbox_pod)
+    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
+    log "Pod toolbox: ${toolbox_pod}"
+
+    log "Creando/obteniendo el proyecto..."
     project_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-project.rb" 2>/dev/null || true)
 
     project_repo_url=$(printf '%s\n' "$project_output" | tail -n 1 | tr -d '\r')
     if [ -z "$project_repo_url" ] || [ "$project_repo_url" = "nil" ]; then
-        echo "No pude crear el proyecto '${PROJECT_FULL_PATH}'."
-        echo "Salida: $project_output"
+        echo "No pude crear el proyecto '${PROJECT_FULL_PATH}'." >&2
+        echo "Salida: $project_output" >&2
         exit 1
     fi
+    log "Proyecto listo: ${project_repo_url}"
 }
 
 create_gitlab_pat() {
     local toolbox_pod pat_output
-    toolbox_pod=$(get_toolbox_pod)
-    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab."; exit 1; }
+    banner "3/4 Creando Personal Access Token '${GITLAB_PAT_NAME}'"
 
-    log "3/4" "Creando Personal Access Token '${GITLAB_PAT_NAME}'..."
+    toolbox_pod=$(get_toolbox_pod)
+    [ -z "$toolbox_pod" ] && { echo "No encuentro el pod toolbox de GitLab." >&2; exit 1; }
+
+    log "Generando token de acceso a GitLab..."
     pat_output=$(kubectl exec -i -n gitlab -c toolbox "$toolbox_pod" -- \
         gitlab-rails runner - < "${BONUS_ROOT}/confs/gitlab-create-pat.rb" 2>/dev/null || true)
 
     PAT_TOKEN=$(printf '%s\n' "$pat_output" | tail -n 1 | tr -d '\r')
     if [ -z "$PAT_TOKEN" ]; then
-        echo "No pude crear el token de acceso."
-        echo "Salida: $pat_output"
+        echo "No pude crear el token de acceso." >&2
+        echo "Salida: $pat_output" >&2
         exit 1
     fi
 
     echo "$PAT_TOKEN" > "$PAT_FILE"
     chmod 600 "$PAT_FILE"
     export PAT_TOKEN
+    log "Token guardado en ${PAT_FILE}"
 }
 
 push_to_gitlab() {
-    log "4/4" "Haciendo push del manifiesto a GitLab..."
+    banner "4/4 Haciendo push del manifiesto a GitLab"
 
     if [ -f "/bonus/confs/deployment.yaml" ]; then
         MANIFEST_PATH="/bonus/confs/deployment.yaml"
@@ -94,6 +121,7 @@ push_to_gitlab() {
     WORK_DIR=$(mktemp -d)
     trap 'rm -rf "$WORK_DIR"' EXIT
 
+    log "Preparando repositorio local temporal en ${WORK_DIR}..."
     cp "$MANIFEST_PATH" "$WORK_DIR/deployment.yaml"
 
     cd "$WORK_DIR"
@@ -111,10 +139,12 @@ push_to_gitlab() {
     git remote add origin "$AUTH_URL"
 
     if git ls-remote --exit-code --heads origin main >/dev/null 2>&1; then
+        log "El repositorio ya tiene 'main' — sincronizando antes de pushear..."
         git fetch -q origin main
         git merge -q --allow-unrelated-histories -s ours -m "Sync" origin/main
     fi
 
+    log "Haciendo push a ${PROJECT_REPO_URL_PUSH}..."
     git push -u origin main -q
 }
 
@@ -124,9 +154,9 @@ create_gitlab_pat
 push_to_gitlab
 
 echo ""
-echo "============================================================"
-echo "  Repositorio GitLab listo"
-echo "============================================================"
+echo -e "${CYAN}============================================================${NC}"
+echo -e "${CYAN}  Repositorio GitLab listo${NC}"
+echo -e "${CYAN}============================================================${NC}"
 echo ""
 echo "  URL:      http://gitlab.localhost:8080/${PROJECT_FULL_PATH}"
 echo "  rama:     main"

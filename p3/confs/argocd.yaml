@@ -1,4 +1,4 @@
-# Con este archivo le decimos a ArgoCD que tome el repo de Github que hemos creado,
+# Manifest de ArgoCD que le indica que debe tomar el repositorio de github, 
 # y lo despliegue en nuestro cluster cada vez que detecte un cambio (auto sync).
 apiVersion: argoproj.io/v1alpha1
 kind: Application

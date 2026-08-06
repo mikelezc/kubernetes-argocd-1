@@ -1,12 +1,10 @@
 #!/bin/bash
 # Toolbox para p3: kubectl + k3d + docker(cliente) sin necesitar sudo en el host.
-# Los contenedores que k3d crea se lanzan en el Docker del host (vía el socket
-# montado abajo), no anidados dentro de este contenedor.
-#
+
 # Uso:
-#   ./toolbox/run.sh ./scripts/install.sh   # instala el clúster igual que sin toolbox
-#   ./toolbox/run.sh kubectl get pods -n dev
-#   ./toolbox/run.sh                        # shell interactiva con las herramientas listas
+#   ./toolbox/run.sh ./scripts/install.sh		# instala el clúster igual que sin toolbox
+#   ./toolbox/run.sh kubectl get pods -n dev	# ejecución directa de comandos dentro del contenedor
+#   ./toolbox/run.sh                       		# shell interactiva con las herramientas listas
 
 set -euo pipefail
 

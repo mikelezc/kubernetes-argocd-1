@@ -1,7 +1,6 @@
 #!/bin/sh
-# Crea (si no existen) los buckets que necesita GitLab en MinIO, con política
-# privada. ACCESS_KEY y SECRET_KEY llegan como variables de entorno del
-# contenedor (los fija scripts/install.sh al lanzar el pod)
+# Crea (si no existen) los buckets que necesita GitLab en MinIO, con política privada. 
+# ACCESS_KEY y SECRET_KEY llegan como variables de entorno del contenedor
 mc alias set myminio http://gitlab-minio-svc.gitlab.svc:9000 "$ACCESS_KEY" "$SECRET_KEY" >/dev/null 2>&1
 
 for b in registry git-lfs runner-cache gitlab-uploads gitlab-artifacts \

@@ -1,7 +1,5 @@
 # Baja la reconciliación de Argo CD de ~3 minutos a 5 segundos, para que en
-# la demo el cambio de v1 a v2 se note casi al instante. Aplicado con
-# "kubectl patch configmap argocd-cm --type merge --patch-file ..." por
-# scripts/install.sh.
+# la demo el cambio de v1 a v2 se note más rápido.
 data:
   timeout.reconciliation: "5s"
   timeout.reconciliation.jitter: "0s"
