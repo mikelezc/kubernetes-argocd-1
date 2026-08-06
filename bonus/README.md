@@ -17,15 +17,13 @@ GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado re
 
 1. **GitLab (self-hosted)**: plataforma de Git con interfaz web, equivalente a GitHub pero corriendo en infraestructura propia en vez de en la nube de un tercero. Aquí sustituye a GitHub como la fuente de la verdad que Argo CD vigila.
 
-2. **Helm**: gestor de paquetes para Kubernetes. Un `chart` empaqueta todos los manifiestos que necesita una aplicación compleja (Deployments, Services, Secrets, ConfigMaps...) para instalarla con un solo comando y un fichero de valores (`values.yaml`). Lo usamos porque desplegar GitLab entero (webservice, Redis, PostgreSQL, MinIO, KAS...) a mano sería mucho más complejo.
+2. **Helm**: gestor de paquetes para Kubernetes. Un `chart` empaqueta todos los manifiestos que necesita una aplicación compleja (Deployments, Services, Secrets, ConfigMaps...) para instalarla con un solo comando y un fichero de valores (`values.yaml`). Lo usamos porque desplegar GitLab entero a mano sería mucho más complejo.
 
 3. **MinIO**: almacenamiento de objetos compatible con S3 que GitLab usa internamente para adjuntos, artefactos de CI (continuous integration), backups, etc. Hay que inicializar sus buckets "manualmente" tras el despliegue porque el chart de Helm no lo hace por defecto.
 
 4. **Por qué bonus comparte el clúster de p3 en vez de tener uno propio**: el DNS interno de GitLab (`gitlab-webservice-default.gitlab.svc`) solo resuelve dentro de su propio clúster, si Argo CD viviera en un clúster distinto, no podría resolverlo sin depender de soluciones demasiado frágiles. 
 
 Como **p3 corre dentro de su propia VM de Vagrant** (ver `p3/README.md`), instalar GitLab en ese mismo clúster resuelve esto de raíz: todo comparte el mismo DNS interno, y no hace falta duplicar Argo CD ni el clúster.
-
-   Lo único que sí exige atención: GitLab necesita bastante más RAM que p3 por sí solo (~8GB frente a los ~2GB por defecto de p3). Por eso `scripts/install.sh` redimensiona la VM de p3 (`vagrant reload`) la primera vez que hace falta (ver más abajo).
 
 5. **Namespaces**: `gitlab` (lo crea este bonus), `argocd` y `dev` ya existen, previamente creados por p3.
 
@@ -81,13 +79,11 @@ A partir de ahí, la versión que Argo CD vigila de verdad vive dentro de GitLab
 
 2. Vagrant instalado y funcionando.
 
-3. Al menos 8GB de RAM libre en la máquina. GitLab es pesado, y `install.sh` redimensiona la VM de p3 a ese tamaño automáticamente.
+3. Al menos 8GB de RAM libre en la máquina.
 
 ---
 
 ## Arranque de infraestructura
-
-Desde `bonus/`, con `p3/` ya levantada:
 
 ```bash
 ./scripts/install.sh
@@ -97,7 +93,7 @@ Este script detecta que no hay kubeconfig local y entra en la VM de p3 (`vagrant
 
 Antes de instalar nada comprueba la RAM real de esa VM: si no llega a lo que necesita GitLab, la redimensiona (`P3_MEMORY=8192 P3_CPUS=3 vagrant reload`, esto reinicia la VM, tarda un poco). 
 
-Si ya está al tamaño correcto (por ejemplo, en una segunda ejecución), se lo salta. Ya dentro, instala GitLab (namespace `gitlab`) vía Helm e inicializa sus buckets de MinIO. Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
+Si ya está al tamaño correcto, se lo salta. Ya dentro, instala GitLab (namespace `gitlab`) vía Helm e inicializa sus buckets de MinIO. Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
 
 ---
 
