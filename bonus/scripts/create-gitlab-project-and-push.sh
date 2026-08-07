@@ -35,14 +35,11 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
-# Este script asume GitLab ya instalado; si no, fallará aquí con un
-# mensaje claro. Mejor que dejar que falle más abajo buscando el pod de GitLab.
 if ! kubectl get ns gitlab >/dev/null 2>&1; then
     echo "GitLab no está instalado (no existe el namespace 'gitlab'). Ejecuta primero ./scripts/install.sh." >&2
     exit 1
 fi
 
-# El loadbalancer de k3d lo publica p3 en el puerto 8080 de la VM
 GITLAB_VM_URL="http://gitlab.localhost:8080"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"
@@ -56,9 +53,13 @@ get_gitlab_pod() {
 
 wait_for_gitlab_ui() {
     banner "1/4 Esperando GitLab disponible en el clúster"
-    log "Esperando el pod de GitLab (puede tardar varios minutos la primera vez)..."
-    kubectl -n gitlab wait --for=condition=ready pod \
-        -l app=gitlab --timeout=900s >/dev/null 2>&1 || true
+    log "Esperando el pod de GitLab..."
+    if ! kubectl -n gitlab wait --for=condition=ready pod -l app=gitlab --timeout=900s >/dev/null 2>&1; then
+        echo "El pod de GitLab no quedó listo a tiempo. Estado actual:" >&2
+        kubectl get pods -n gitlab -o wide
+        kubectl describe pod -n gitlab -l app=gitlab | tail -30
+        exit 1
+    fi
     log "GitLab disponible."
 }
 
