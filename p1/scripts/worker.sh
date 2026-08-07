@@ -16,7 +16,7 @@ echo -e "${CYAN} 2/2 Instalando K3S en modo AGENT en mlezcanoSW...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
 echo -e "${CYAN}Esperando por el node-token de K3s Server para establecer conexión...${NC}"
-timeout=60
+timeout=120
 while [ ! -f /vagrant/node-token ]; do
   timeout=$((timeout - 2))
   [ "$timeout" -le 0 ] && { echo "node-token no apareció a tiempo" >&2; exit 1; }
