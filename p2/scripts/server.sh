@@ -22,7 +22,7 @@ echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} 2/3 Esperando a que el clúster inicie correctamente...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
-timeout=60
+timeout=120
 while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
   timeout=$((timeout - 2))
   [ "$timeout" -le 0 ] && { echo "k3s.yaml no apareció a tiempo" >&2; exit 1; }
