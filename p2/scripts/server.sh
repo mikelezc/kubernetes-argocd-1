@@ -9,7 +9,7 @@ SERVER_IP=$1
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} 1/3 Instalando K3S en modo SERVER...${NC}"
+echo -e "${CYAN} 1/3 Instalando K3S...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
@@ -25,7 +25,13 @@ echo -e "${CYAN}=========================================================${NC}"
 timeout=120
 while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
   timeout=$((timeout - 2))
-  [ "$timeout" -le 0 ] && { echo "k3s.yaml no apareció a tiempo" >&2; exit 1; }
+  if [ "$timeout" -le 0 ]; then
+    echo "k3s.yaml no se generó a tiempo. Estado del servicio k3s:" >&2
+    systemctl status k3s --no-pager >&2
+    echo "--- Últimas líneas del log (journalctl -u k3s) ---" >&2
+    journalctl -u k3s --no-pager -n 50 >&2
+    exit 1
+  fi
   sleep 2
 done
 
