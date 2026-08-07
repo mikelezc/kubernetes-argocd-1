@@ -35,14 +35,11 @@ fi
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"		# Usamos el kubeconfig de la VM si no se ha especificado otro
 
-# Este script asume GitLab ya instalado; si no, fallará aquí con un
-# mensaje claro. Mejor que dejar que falle más abajo buscando el pod de GitLab.
 if ! kubectl get ns gitlab >/dev/null 2>&1; then
     echo "GitLab no está instalado (no existe el namespace 'gitlab'). Ejecuta primero ./scripts/install.sh." >&2
     exit 1
 fi
 
-# El loadbalancer de k3d lo publica p3 en el puerto 8080 de la VM
 GITLAB_VM_URL="http://gitlab.localhost:8080"
 PROJECT_NAMESPACE="root"
 PROJECT_PATH="mlezcano-gitlab-demo"

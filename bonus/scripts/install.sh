@@ -25,7 +25,7 @@ banner() {
 }
 
 # Re-ejecución automática dentro de la VM de p3 si se lanza desde el host.
-# Antes de entrar, redimensionamos la VM ya que GitLab necesita más RAM que en p3 (implica un "vagrant reload").
+# Antes de entrar, redimensionamos la VM ya que GitLab necesita más RAM que en p3 si fuera necesario.
 if [ -z "${BONUS_INSIDE_VM:-}" ] && [ ! -s "$KUBECONFIG_DEFAULT" ]; then
     P3_ROOT="$(cd "${BONUS_ROOT}/../p3" 2>/dev/null && pwd || true)"
     if command -v vagrant >/dev/null 2>&1 && [ -n "$P3_ROOT" ] && [ -f "${P3_ROOT}/Vagrantfile" ]; then
@@ -59,7 +59,7 @@ if ! k3d cluster list iot-cluster >/dev/null 2>&1; then
     exit 1
 fi
 
-# Arrancamos el clúster k3d si no está ya arriba (puede haberse quedado parado tras un reload).
+# Arrancamos el clúster k3d si no está ya arriba (puede haberse quedado parado tras el reload).
 k3d cluster start iot-cluster >/dev/null 2>&1 || true
 
 export KUBECONFIG="${KUBECONFIG:-$KUBECONFIG_DEFAULT}"
@@ -84,7 +84,7 @@ if ! wait_for_node_ready; then
     log_warn "El nodo tarda más de lo normal en responder — se probará igualmente"
 fi
 
-# Acceso a bonus/confs desde dentro de la VM de p3 (montado en p3/Vagrantfile)
+# Si existe /bonus/confs, lo usamos. Si no, usamos el que está en el repo del bonus.
 if [ -d "/bonus/confs" ]; then
     CONFS_DIR="/bonus/confs"
 else
@@ -108,14 +108,13 @@ if ! wait_for_vm_dns; then
     exit 1
 fi
 
-banner "1/2 Desplegando GitLab (imagen oficial Omnibus)"
+banner "1/2 Desplegando GitLab"
 
-# Sin Helm ni chart: GitLab Omnibus es un único contenedor con todo embebido
-# (Postgres/Redis/Gitaly/Puma/Sidekiq), así que namespace + Deployment bastan.
+# Aplicamos los manifiestos de GitLab (namespace + deployment + service)
 kubectl apply -f "$CONFS_DIR/namespaces.yaml"
 kubectl apply -f "$CONFS_DIR/gitlab.yaml"
 
-log "Esperando a que GitLab termine su primer arranque (reconfigure + migraciones, ~15 minutos)..."
+log "Esperando a que GitLab termine su primer arranque (reconfigure + migraciones, puede tardar unos minutos)..."
 if ! kubectl -n gitlab rollout status deployment/gitlab --timeout=1200s; then
     echo "Error: GitLab no llegó a estar listo a tiempo. Revisa 'kubectl -n gitlab logs deploy/gitlab'." >&2
     exit 1
