@@ -35,10 +35,10 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
 echo  -e "${CYAN}Generando token de nodo de K3s...${NC}"
 
 # Protegemos el token de nodo para que solo los nodos worker puedan unirse al clúster.
-timeout=60
+timeout=120
 while [ ! -f /var/lib/rancher/k3s/server/node-token ]; do
   timeout=$((timeout - 2))
-  [ "$timeout" -le 0 ] && { echo "node-token no apareció a tiempo" >&2; exit 1; }
+  [ "$timeout" -le 0 ] && { echo "node-token no se generó a tiempo" >&2; exit 1; }
   sleep 2
 done
 

@@ -9,7 +9,7 @@ SERVER_IP=$1
 IFACE=$(ip -4 addr show | grep $SERVER_IP | awk '{print $NF}')
 
 echo -e "${CYAN}=========================================================${NC}"
-echo -e "${CYAN} 1/3 Instalando K3S en modo SERVER...${NC}"
+echo -e "${CYAN} 1/3 Instalando K3S...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server \
@@ -22,10 +22,16 @@ echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} 2/3 Esperando a que el clúster inicie correctamente...${NC}"
 echo -e "${CYAN}=========================================================${NC}"
 
-timeout=60
+timeout=120
 while [ ! -f /etc/rancher/k3s/k3s.yaml ]; do
   timeout=$((timeout - 2))
-  [ "$timeout" -le 0 ] && { echo "k3s.yaml no apareció a tiempo" >&2; exit 1; }
+  if [ "$timeout" -le 0 ]; then
+    echo "k3s.yaml no se generó a tiempo. Estado del servicio k3s:" >&2
+    systemctl status k3s --no-pager >&2
+    echo "--- Últimas líneas del log (journalctl -u k3s) ---" >&2
+    journalctl -u k3s --no-pager -n 50 >&2
+    exit 1
+  fi
   sleep 2
 done
 
@@ -33,9 +39,24 @@ done
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # Esperamos a que Traefik se cree (--for=create) y complete su instalación (--for=condition=complete)
-kubectl wait --for=create job/helm-install-traefik -n kube-system --timeout=60s
-kubectl wait --for=condition=complete job/helm-install-traefik -n kube-system --timeout=180s
-kubectl wait --for=condition=available deployment/traefik -n kube-system --timeout=180s
+kubectl wait --for=create job/helm-install-traefik -n kube-system --timeout=60s || {
+  echo "El Job de Helm-Traefik no se creó a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe job/helm-install-traefik -n kube-system
+  exit 1
+}
+kubectl wait --for=condition=complete job/helm-install-traefik -n kube-system --timeout=240s || {
+  echo "El Job de Helm-Traefik no se completó a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe job/helm-install-traefik -n kube-system
+  exit 1
+}
+kubectl wait --for=condition=available deployment/traefik -n kube-system --timeout=240s || {
+  echo "El Deployment de Traefik no quedó disponible a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe deployment/traefik -n kube-system
+  exit 1
+}
 
 echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} 3/3 Desplegando las 3 aplicaciones en el clúster...${NC}"
