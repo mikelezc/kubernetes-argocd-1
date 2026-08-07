@@ -30,8 +30,18 @@ banner() {
   echo -e "${CYAN}=========================================================${NC}"
 }
 
-# Función para instalar las herramientas necesarias en Linux (Docker, kubectl, k3d)
+# Configuramos DNS en el host para que pueda resolver nombres externos
+configure_host_dns() {
+  printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > /etc/resolv.conf
+  if [ -f /etc/dhcpcd.conf ] && ! grep -q '^nohook resolv.conf' /etc/dhcpcd.conf; then
+    echo 'nohook resolv.conf' >> /etc/dhcpcd.conf
+  fi
+}
+
+# Instalamos las herramientas necesarias en Linux (Docker, kubectl, k3d)
 install_linux_tools() {
+  configure_host_dns
+
   if ! command -v docker >/dev/null 2>&1; then
     curl -fsSL https://get.docker.com | sudo sh
   fi
@@ -60,8 +70,8 @@ install_linux_tools() {
   configure_docker_dns
 }
 
-# Función para configurar DNS en Docker para Linux 
-# (aseguramos que los contenedores puedan resolver nombres externos).
+# Configuramos DNS en Docker para Linux 
+# Contenedores puedan resolver nombres externos para que Argo CD funcione correctamente
 configure_docker_dns() {
   local daemon_json="/etc/docker/daemon.json"
   if [ -f "$daemon_json" ] && command -v python3 >/dev/null 2>&1; then
@@ -83,7 +93,7 @@ PY
   systemctl restart docker
 }
 
-# Función para instalar herramientas necesarias en macOS (Homebrew, kubectl, k3d, Docker)
+# En caso de necesitar instalar herramientas en macOS, se requiere Homebrew y Docker Desktop.
 install_macos_tools() {
   if ! command -v brew >/dev/null 2>&1; then
     echo "Homebrew no está instalado. Instálalo antes de continuar." >&2
@@ -104,11 +114,15 @@ install_macos_tools() {
   fi
 }
 
+# Verificamos que Docker esté listo antes de continuar
 ensure_docker_ready() {
-  if ! docker info >/dev/null 2>&1; then
-    echo "Docker no responde todavía. Arranca Docker Desktop o verifica permisos sobre el socket." >&2
-    exit 1
-  fi
+  for attempt in 1 2 3 4 5; do
+    docker info >/dev/null 2>&1 && return 0
+    echo "Docker todavía no responde, reintentando (intento $attempt/5)..."
+    sleep 2
+  done
+  echo "El daemon de Docker no responde. Arranca Docker Desktop o verifica permisos sobre el socket." >&2
+  exit 1
 }
 
 # Parcheo de los pods de CoreDNS para que hagan forward a servidores DNS públicos 
@@ -139,7 +153,15 @@ wait_for_dns() {
 
 wait_for_argocd() {
   echo "Esperando que se creen los pods de ArgoCD..."
+  timeout=120
   while ! kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server 2>/dev/null | grep -q argocd-server; do
+    timeout=$((timeout - 2))
+    if [ "$timeout" -le 0 ]; then
+      echo "El pod de argocd-server no se creó a tiempo. Estado actual:" >&2
+      kubectl get pods -n argocd -o wide
+      kubectl get events -n argocd --sort-by=.lastTimestamp | tail -20
+      exit 1
+    fi
     sleep 2
   done
   kubectl wait --for=condition=Ready pods --all -n argocd --timeout=300s >/dev/null
