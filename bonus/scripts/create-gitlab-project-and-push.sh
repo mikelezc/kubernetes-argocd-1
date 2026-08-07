@@ -53,9 +53,13 @@ get_gitlab_pod() {
 
 wait_for_gitlab_ui() {
     banner "1/4 Esperando GitLab disponible en el clúster"
-    log "Esperando el pod de GitLab (puede tardar varios minutos la primera vez)..."
-    kubectl -n gitlab wait --for=condition=ready pod \
-        -l app=gitlab --timeout=900s >/dev/null 2>&1 || true
+    log "Esperando el pod de GitLab..."
+    if ! kubectl -n gitlab wait --for=condition=ready pod -l app=gitlab --timeout=900s >/dev/null 2>&1; then
+        echo "El pod de GitLab no quedó listo a tiempo. Estado actual:" >&2
+        kubectl get pods -n gitlab -o wide
+        kubectl describe pod -n gitlab -l app=gitlab | tail -30
+        exit 1
+    fi
     log "GitLab disponible."
 }
 
