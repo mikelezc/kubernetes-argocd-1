@@ -18,7 +18,7 @@ else
   REPO_ROOT="$ROOT_DIR"
 fi
 CLUSTER_NAME="iot-cluster"
-ARGOCD_VERSION="v2.10.4"
+ARGOCD_VERSION="v3.4.5"
 
 log() {
   printf '\n%b==> %s%b\n' "$CYAN" "$1" "$NC"
@@ -58,13 +58,22 @@ install_linux_tools() {
       *) echo "Arquitectura no soportada: $arch" >&2; exit 1 ;;
     esac
     tmpdir="$(mktemp -d)"
-    curl -L "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${k8s_arch}/kubectl" -o "$tmpdir/kubectl"
+    for attempt in 1 2 3; do
+      curl -L "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${k8s_arch}/kubectl" -o "$tmpdir/kubectl" && break
+      echo "Fallo descargando kubectl, reintentando (intento $attempt/3)..." >&2
+      sleep 3
+    done
     sudo install -o root -g root -m 0755 "$tmpdir/kubectl" /usr/local/bin/kubectl
     rm -rf "$tmpdir"
   fi
 
   if ! command -v k3d >/dev/null 2>&1; then
-    curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+    for attempt in 1 2 3; do
+      curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash && break
+      echo "Fallo instalando k3d, reintentando (intento $attempt/3)..." >&2
+      sleep 3
+    done
+    command -v k3d >/dev/null 2>&1 || { echo "No se pudo instalar k3d tras 3 intentos." >&2; exit 1; }
   fi
 
   configure_docker_dns
@@ -204,7 +213,7 @@ main() {
   log "Namespaces creados: $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}')"
 
   banner "4/5 Instalando Argo CD"
-  kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" >/dev/null
+  kubectl apply -n argocd --server-side --force-conflicts -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml" >/dev/null
   wait_for_argocd
 
   log "Ajustando la reconciliación de Argo CD (a pocos segundos)"
