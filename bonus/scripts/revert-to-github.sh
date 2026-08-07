@@ -62,6 +62,22 @@ log "Forzando refresh de 'iot-app'..."
 kubectl -n argocd annotate application iot-app \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null
 
+log "Esperando a que 'iot-app' se sincronice y quede en estado Healthy..."
+timeout=120
+while true; do
+    sync_status=$(kubectl -n argocd get application iot-app -o jsonpath='{.status.sync.status}' 2>/dev/null)
+    health_status=$(kubectl -n argocd get application iot-app -o jsonpath='{.status.health.status}' 2>/dev/null)
+    [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ] && break
+    timeout=$((timeout - 3))
+    if [ "$timeout" -le 0 ]; then
+        echo "'iot-app' no quedó Synced/Healthy a tiempo (sync=$sync_status, health=$health_status). Estado actual:" >&2
+        kubectl -n argocd get application iot-app -o wide
+        exit 1
+    fi
+    sleep 3
+done
+log "'iot-app' Synced y Healthy."
+
 echo ""
 echo "Hecho. 'iot-app' vuelve a apuntar a GitHub."
 echo ""
