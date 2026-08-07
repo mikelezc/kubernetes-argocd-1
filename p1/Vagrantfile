@@ -2,11 +2,12 @@ Vagrant.configure("2") do |config|
   # ==========================================
   # CONFIGURACIÓN CROSS-PLATFORM (LINUX vs MAC M4)
   # ==========================================
-  # bento/ubuntu-26.04: última LTS de Ubuntu, en su variante Bento (imagen recortada). 
-  # No es la distro más ligera posible (Alpine pesa menos), pero mantiene systemd/apt,
-  # que es lo que espera el script oficial de instalación de k3s sin fricción.
+  # bento/debian-13 (trixie): última estable de Debian, en su variante Bento (imagen recortada).
+  # Más ligera que Ubuntu, mantiene systemd/apt igual que Ubuntu (sin fricción con k3s
+  # ni con kubeadm más adelante). Alpine pesa menos aún, pero usa OpenRC/musl y no está
+  # soportado oficialmente por kubeadm.
 
-  BOX				= "bento/ubuntu-26.04"
+  BOX				= "bento/debian-13"
   SERVER_VM_NAME	= "mlezcanoS"
   WORKER_VM_NAME	= "mlezcanoSW"
   SERVER_IP			= "192.168.56.110"
