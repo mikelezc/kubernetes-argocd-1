@@ -33,9 +33,24 @@ done
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # Esperamos a que Traefik se cree (--for=create) y complete su instalación (--for=condition=complete)
-kubectl wait --for=create job/helm-install-traefik -n kube-system --timeout=60s
-kubectl wait --for=condition=complete job/helm-install-traefik -n kube-system --timeout=180s
-kubectl wait --for=condition=available deployment/traefik -n kube-system --timeout=180s
+kubectl wait --for=create job/helm-install-traefik -n kube-system --timeout=60s || {
+  echo "El Job de Helm-Traefik no se creó a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe job/helm-install-traefik -n kube-system
+  exit 1
+}
+kubectl wait --for=condition=complete job/helm-install-traefik -n kube-system --timeout=240s || {
+  echo "El Job de Helm-Traefik no se completó a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe job/helm-install-traefik -n kube-system
+  exit 1
+}
+kubectl wait --for=condition=available deployment/traefik -n kube-system --timeout=240s || {
+  echo "El Deployment de Traefik no quedó disponible a tiempo. Estado actual:" >&2
+  kubectl get pods -n kube-system -o wide
+  kubectl describe deployment/traefik -n kube-system
+  exit 1
+}
 
 echo -e "${CYAN}=========================================================${NC}"
 echo -e "${CYAN} 3/3 Desplegando las 3 aplicaciones en el clúster...${NC}"
