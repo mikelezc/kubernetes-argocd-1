@@ -1,0 +1,64 @@
+Vagrant.configure("2") do |config|
+  # ==========================================
+  # Laboratorio personal de kubeadm (material de estudio para el CKA)
+  # No es parte de la entrega del subject — ver p1/kubeadm-lab/GUIA_KUBEADM.md
+  # ==========================================
+  BOX          = "bento/debian-13"
+  CP_NAME      = "cka-cp"
+  WORKER_NAME  = "cka-worker"
+  CP_IP        = "192.168.56.120"
+  WORKER_IP    = "192.168.56.121"
+  NETWORK_NAME = "private_network"
+
+  is_mac_arm = RUBY_PLATFORM =~ /arm64/ || RUBY_PLATFORM =~ /aarch64/ ||
+               (RUBY_PLATFORM =~ /darwin/ && `uname -m`.strip == 'arm64')
+  provider = is_mac_arm ? (ENV['VAGRANT_DEFAULT_PROVIDER'] || "vmware_desktop") : "virtualbox"
+
+  config.vm.box = BOX
+
+  # ==========================================
+  # Control-plane: 2 CPU / 2048MB
+  # ==========================================
+  # kubeadm hace preflight checks obligatorios: rechaza iniciar el control-plane
+  # con menos de 2 CPUs o menos de ~1700MB de RAM (a diferencia de K3s, que no
+  # comprueba nada de esto). Por eso este lab no usa el mínimo de 1 CPU/512MB
+  # de p1 — es justo una de las diferencias que conviene conocer para el examen.
+  config.vm.define CP_NAME do |cp|
+    cp.vm.hostname = CP_NAME
+    cp.vm.network NETWORK_NAME, ip: CP_IP
+    cp.vm.provider provider do |v|
+      if provider == "vmware_desktop"
+        v.vmx["displayname"] = CP_NAME
+        v.vmx["memsize"] = "2048"
+        v.vmx["numvcpus"] = "2"
+        v.vmx["cpuid.coresPerSocket"] = "1"
+      else
+        v.name = CP_NAME
+        v.memory = 2048
+        v.cpus = 2
+      end
+    end
+  end
+
+  # ==========================================
+  # Worker: 1 CPU / 1024MB (el worker no tiene el mismo preflight de CPU)
+  # ==========================================
+  config.vm.define WORKER_NAME do |worker|
+    worker.vm.hostname = WORKER_NAME
+    worker.vm.network NETWORK_NAME, ip: WORKER_IP
+    worker.vm.provider provider do |v|
+      if provider == "vmware_desktop"
+        v.vmx["displayname"] = WORKER_NAME
+        v.vmx["memsize"] = "1024"
+        v.vmx["numvcpus"] = "1"
+      else
+        v.name = WORKER_NAME
+        v.memory = 1024
+        v.cpus = 1
+      end
+    end
+  end
+
+  # Sin provisioners a propósito: todo el proceso de instalación de kubeadm se
+  # hace a mano siguiendo GUIA_KUBEADM.md siguiendo el ejercicio.
+end
