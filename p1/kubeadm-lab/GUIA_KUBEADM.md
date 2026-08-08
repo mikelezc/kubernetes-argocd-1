@@ -88,7 +88,7 @@ Kubernetes ya no incluye un runtime propio (`dockershim` se eliminó en la 1.24)
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable" | sudo tee /etc/apt/sources.list.d/docker.list
 sudo apt-get update
@@ -143,6 +143,8 @@ kubectl version --client
 **Repite toda la Sección 2 en `cka-worker` antes de continuar.** El control-plane y el worker necesitan exactamente las mismas piezas (containerd + kubelet + kubeadm), aunque solo `kubeadm init` se ejecute en uno y `kubeadm join` en el otro.
 
 ---
+
+**Las piezas básicas del exámen arrancarían desde aquí**
 
 ## 3. `kubeadm init` — arrancar el control-plane
 
