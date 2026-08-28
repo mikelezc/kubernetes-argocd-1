@@ -77,6 +77,22 @@ A partir de ahí, la versión que Argo CD vigila de verdad vive dentro de GitLab
 
 3. Al menos 8GB de RAM libre en la máquina.
 
+> Si en vez de eso `p3` se despliega en modo host dentro de la VM de corrección `iot-workstation` del Plan B, sin Vagrant — ver la nota siguiente.
+
+### Usando `p3` en modo host (sin Vagrant) — p. ej. dentro de `iot-workstation`
+
+`bonus/scripts/install.sh` asume por defecto que `p3` corrió dentro de una VM de Vagrant: busca el kubeconfig en `/home/vagrant/.kube/config`, y si no lo encuentra, intenta comprobar el estado de una VM de Vagrant vía `vagrant status`. 
+
+Si `p3` se desplegó en modo host (`p3/README.md`, "Camino 1"), esa ruta no existe y el script fallaría con *"La VM de p3 no está levantada"* aunque `p3` sí esté corriendo.
+
+El propio script ya soporta este caso — solo hay que exportar dos variables antes de lanzarlo, para saltar la comprobación de Vagrant y apuntar al kubeconfig real:
+
+```bash
+export BONUS_INSIDE_VM=1
+export KUBECONFIG=~/.kube/config   # o /root/.kube/config, según dónde lo dejara p3/scripts/install.sh
+./scripts/install.sh
+```
+
 ---
 
 ## Arranque de infraestructura
