@@ -40,6 +40,17 @@ Qué hace cada trozo:
 
 **Login**: usuario `iot`, contraseña `iot` (vale tanto en la ventana como por SSH).
 
+**Para probar en el Mac** (mismo comando, sin `-enable-kvm` porque aquí no hay CPU x86 real):
+```bash
+qemu-system-x86_64 \
+  -accel tcg -cpu max \
+  -m 4096 -smp 4 \
+  -drive file=iot-workstation.qcow2,if=virtio,format=qcow2,discard=unmap,detect-zeroes=unmap \
+  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:12222-:22 -device virtio-net-pci,netdev=net0 \
+  -device virtio-vga,xres=1920,yres=1080 -display cocoa
+```
+Va lento (emulación por software) — solo para comprobar que el escritorio arranca y entrar por SSH, no para levantar `p1`/`p2`/`p3` de verdad (eso solo funciona con CPU real, en el campus).
+
 ---
 
 ## 3. Meter el proyecto dentro
