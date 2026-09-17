@@ -9,7 +9,9 @@ El subject del bonus lo pide así literalmente — *"add GitLab to the lab you c
 GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado real)
 ```
 
-> **Requisito previo importante**: `p3/` tiene que estar levantada con `vagrant up` antes de usar el contenido de esta parte `bonus`. 
+> **Requisito previo importante**: `p3/` tiene que estar levantada antes de usar el contenido de esta parte `bonus`.
+
+Puede ser con `vagrant up` o en modo host sin Vagrant (ver "Usando `p3` en modo host" más abajo).
 
 ---
 
@@ -21,13 +23,13 @@ GitLab local (estado deseado) -> Argo CD (reconciliación) -> Cluster (estado re
 
 3. **Por qué bonus comparte el clúster de p3 en vez de tener uno propio**: el DNS interno de GitLab (`gitlab.gitlab.svc`) solo resuelve dentro de su propio clúster; si Argo CD viviera en un clúster distinto, no podría resolverlo sin depender de soluciones demasiado frágiles.
 
-Como **p3 corre dentro de su propia VM de Vagrant** (ver `p3/README.md`), instalar GitLab en ese mismo clúster resuelve esto de raíz: todo comparte el mismo DNS interno, y no hace falta duplicar Argo CD ni el clúster.
+Como **p3 ya tiene su propio clúster K3d corriendo** (con o sin Vagrant, ver `p3/README.md`), instalar GitLab en ese mismo clúster resuelve esto de raíz: todo comparte el mismo DNS interno, y no hace falta duplicar Argo CD ni el clúster.
 
 4. **Namespaces**: `gitlab` (lo crea este bonus), `argocd` y `dev` ya existen, previamente creados por p3.
 
 5. **Bootstrap en cuatro scripts para entender el funcionamiento del despliegue**:
 
-	- `install.sh` redimensiona la VM de p3 si hace falta, y despliega GitLab (Argo CD y el clúster ya los puso p3).
+	- `install.sh` redimensiona la VM de p3 si hace falta (solo con Vagrant), y despliega GitLab (Argo CD y el clúster ya los puso p3).
 	- `create-gitlab-project-and-push.sh` crea el proyecto en GitLab vía su API y sube el manifiesto inicial.
 	- `connect-argocd-to-gitlab.sh` re-apunta la `Application` `iot-app` (la misma que usa p3, no una nueva) de GitHub a este repo de GitLab local.
 	- `revert-to-github.sh` la vuelve a apuntar a GitHub, para poder demostrar el cambio en los dos sentidos.
@@ -59,7 +61,7 @@ A partir de ahí, la versión que Argo CD vigila de verdad vive dentro de GitLab
 
 5. [confs/namespaces.yaml](confs/namespaces.yaml): el namespace `gitlab` (`argocd`/`dev` ya existen gracias a p3).
 
-6. [scripts/install.sh](scripts/install.sh): redimensiona la VM de p3 (`vagrant reload`) si hace falta y despliega GitLab (`confs/gitlab.yaml`) encima del clúster ya existente.
+6. [scripts/install.sh](scripts/install.sh): con Vagrant, redimensiona la VM de p3 (`vagrant reload`) si hace falta; en modo host no redimensiona nada (asegurarse antes de tener 8GB libres). Despliega GitLab (`confs/gitlab.yaml`) encima del clúster ya existente en cualquiera de los dos casos.
 
 7. [scripts/create-gitlab-project-and-push.sh](scripts/create-gitlab-project-and-push.sh): crea el proyecto en GitLab vía su API y sube `confs/deployment.yaml`.
 
@@ -101,11 +103,11 @@ export KUBECONFIG=~/.kube/config   # o /root/.kube/config, según dónde lo deja
 ./scripts/install.sh
 ```
 
-Este script detecta que no hay kubeconfig local y entra en la VM de p3 (`vagrant ssh`). 
+**Con Vagrant**: el script detecta que no hay kubeconfig local y entra en la VM de p3 (`vagrant ssh`). Antes de instalar nada comprueba la RAM real de esa VM: si no llega a lo que necesita GitLab, la redimensiona (`P3_MEMORY=8192 P3_CPUS=3 vagrant reload`, esto reinicia la VM, tarda un poco). Si ya está al tamaño correcto, se lo salta.
 
-Antes de instalar nada comprueba la RAM real de esa VM: si no llega a lo que necesita GitLab, la redimensiona (`P3_MEMORY=8192 P3_CPUS=3 vagrant reload`, esto reinicia la VM, tarda un poco). 
+**En modo host** (`BONUS_INSIDE_VM=1`, ver más arriba): se salta toda esa comprobación y va directo al clúster k3d ya existente — no redimensiona nada, así que hay que asegurarse a mano de tener 8GB libres antes de lanzarlo.
 
-Si ya está al tamaño correcto, se lo salta. Ya dentro, despliega GitLab (namespace `gitlab`, imagen Omnibus) y espera a que termine su primer arranque (migra la base de datos embebida, compila assets... varios minutos). Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
+En cualquiera de los dos casos, despliega GitLab (namespace `gitlab`, imagen Omnibus) y espera a que termine su primer arranque (migra la base de datos embebida, compila assets... varios minutos). Argo CD y el clúster ya estaban arriba gracias a p3. Al terminar, GitLab está listo pero `iot-app` todavía apunta a GitHub.
 
 ---
 
@@ -148,7 +150,7 @@ Para volver a GitHub en cualquier momento (y demostrar el swap en los dos sentid
 ## Checklist de verificación del Subject
 
 
-1. **Accedemos a la VM**:
+1. **Accedemos a la VM** (solo si `p3` se levantó con Vagrant. En modo host ya estamos en la terminal correcta, este paso no aplica):
 
    ```bash
    cd ../p3 && vagrant ssh
@@ -238,8 +240,16 @@ Para volver a GitHub en cualquier momento (y demostrar el swap en los dos sentid
 
 ---
 
-10. **Limpieza**: desde `p3/` (la VM es suya; destruirla se lleva por delante GitLab también),
+10. **Limpieza**:
+
+    **Si `p3` se levantó con Vagrant** (destruirla se lleva por delante GitLab también), desde `p3/`:
 
     ```bash
     vagrant destroy -f
+    ```
+
+    **En modo host** (sin Vagrant), no hay VM que destruir, borrar el clúster k3d directamente:
+
+    ```bash
+    k3d cluster delete iot-cluster
     ```

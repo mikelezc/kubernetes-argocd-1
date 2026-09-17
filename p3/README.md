@@ -173,7 +173,7 @@ P3_MEMORY=4096 P3_CPUS=2 vagrant up
 
 ## Checklist de verificación del Subject
 
-*Nota: Para hacer todas las comprobaciones por consola, entraremos como siempre, a la VM con `vagrant ssh mlezcanoS`*
+*Nota: Los comandos de este checklist se ejecutan en la terminal desde donde se levantó `p3`, directamente si se usó el Camino 1 (host) o 2 (toolbox), o dentro de la VM (`vagrant ssh mlezcanoS`) si se usó el Camino 3 (Vagrant).*
 
 1. **Verificamos los namespaces requeridos**:
 
