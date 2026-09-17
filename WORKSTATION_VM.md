@@ -1,6 +1,7 @@
 # Instalar iot-workstation en el campus — guía rápida (para mí)
 
-Todo está en `/Users/miguel/Desktop/iot-workstation-vm/` (llevar al USB, **sin** `iot-workstation.qcow2.bak`, no hace falta):
+Todo está en `/Users/miguel/Desktop/iot-workstation-vm/`
+
 `iot-workstation.qcow2`, `register-workstation-vm.sh`, `teardown-workstation-vm.sh`
 
 ---
@@ -53,7 +54,21 @@ Va lento (emulación por software) — solo para comprobar que el escritorio arr
 
 ---
 
-## 3. Meter el proyecto dentro
+## 3. Acceder por SSH
+
+```bash
+ssh -p 12222 iot@127.0.0.1
+```
+Usuario `iot`, contraseña `iot` (puerto `2222` si arrancaste por la Vía B/VirtualBox del paso 5).
+
+Si sale "Host key verification failed" (VM reiniciada/recreada):
+```bash
+ssh-keygen -R "[127.0.0.1]:12222"
+```
+
+---
+
+## 4. Meter el proyecto dentro
 
 En el ordenador (fuera de la VM), dentro de la carpeta del repo:
 ```bash
@@ -71,7 +86,7 @@ Descomprime el proyecto ahí dentro.
 
 ---
 
-## 4. Ejecutar el proyecto
+## 5. Ejecutar el proyecto
 
 ```bash
 cd inception-of-things-42/p1
@@ -81,7 +96,7 @@ A partir de aquí, seguir el `README.md` normal de cada parte (`p1`, `p2`, `p3`,
 
 ---
 
-## 5. Si algo falla: plan B con VirtualBox en vez de QEMU
+## 6. Si algo falla: plan B con VirtualBox en vez de QEMU
 
 ```bash
 ./register-workstation-vm.sh /sgoinfre/students/mlezcano/iot-workstation-vm/iot-workstation.qcow2
@@ -91,7 +106,7 @@ El script hace todo solo (crea la VM, activa la virtualización anidada, reserva
 
 ---
 
-## 6. Al terminar
+## 7. Al terminar
 
 ```bash
 ./teardown-workstation-vm.sh
