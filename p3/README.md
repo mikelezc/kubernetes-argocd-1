@@ -360,6 +360,10 @@ P3_MEMORY=4096 P3_CPUS=2 vagrant up
 
 	**Si hemos usado Vagrant**
 
+	- Apagar la VM (SIN destruirla, conserva el clúster k3d/Argo CD ya provisionado): `vagrant halt`. Para retomarlo: `vagrant up` (arranca rápido, sin reprovisionar).
+
+	- Para DESTRUIR por completo:
+
 	 ```bash
     vagrant destroy -f
     ```

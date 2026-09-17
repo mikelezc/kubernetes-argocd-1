@@ -94,6 +94,8 @@ vagrant up
 ```
 A partir de aquí, seguir el `README.md` normal de cada parte (`p1`, `p2`, `p3`, `bonus`) — sin nada especial por usar esta VM.
 
+**Importante al pasar de `p1` a `p2`**: usan la misma IP (`192.168.56.110`). Antes de levantar `p2`, apagar `p1` con `vagrant halt` (NO `destroy`) — así, si hay que volver a `p1` luego, `vagrant up` la arranca rápido sin reprovisionar todo otra vez.
+
 ---
 
 ## 6. Si algo falla: plan B con VirtualBox en vez de QEMU
