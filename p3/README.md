@@ -350,13 +350,14 @@ P3_MEMORY=4096 P3_CPUS=2 vagrant up
 
 9. **Limpieza**: desde `p3/`,
 
-	**Si hemos usado toolbox**
+	**Si hemos usado el Camino 1 (host) o 2 (toolbox)**
 
     ```bash
     ./toolbox/reset.sh          # borra el clúster k3d
     ./toolbox/reset.sh --deep   # además limpia los contenedores/volúmenes/red de ese clúster en Docker
     ./toolbox/reset.sh --full   # --deep + borra también la imagen del toolbox y su kubeconfig cacheado
     ```
+    El script detecta solo si `k3d` está en el host (Camino 1) o hay que pasar por el toolbox (Camino 2) — mismo comando en ambos casos.
 
 	**Si hemos usado Vagrant**
 

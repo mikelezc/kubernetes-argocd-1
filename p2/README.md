@@ -17,7 +17,7 @@ En la Parte 1 levantamos la infraestructura base (los Nodos). En esta Parte 2 da
 
 2. **ReplicaSet**: el Deployment no gestiona los Pods directamente, por debajo crea y delega en un ReplicaSet, que es quien realmente vigila que el número de réplicas activas coincida con lo declarado y recrea Pods si alguno muere. Se ve comparando ambos: `kubectl get deploy` muestra `READY`/`UP-TO-DATE`/`AVAILABLE`, mientras que `kubectl get rs` expone directamente `DESIRED`/`CURRENT`/`READY` el número de réplicas que el Deployment le ha delegado. Kubernetes lo gestiona en cascada desde el Deployment.
 
-3. **Service (ClusterIP)**: Proporciona un punto de acceso estable a la aplicación. Dado que los Pods son efímeros y cambian de IP al reiniciarse, el Service le asigna una IP virtual fija, un nombre DNS interno (ej. `app1-service.default.svc`) y **balancea el tráfico internamente** entre todas las réplicas del Deployment (ver `kubetctl get all -n kube-system`).
+3. **Service (ClusterIP)**: Proporciona un punto de acceso estable a la aplicación. Dado que los Pods son efímeros y cambian de IP al reiniciarse, el Service le asigna una IP virtual fija, un nombre DNS interno (ej. `app1-service.default.svc`) y **balancea el tráfico internamente** entre todas las réplicas del Deployment (ver `kubectl get all -n kube-system`).
 
 4. **Ingress (Traefik)**: Es el punto de entrada unificado al clúster (Proxy Inverso, balanceador de carga y enrutador). Escucha el tráfico que llega al nodo y, analizando el dominio o la cabecera `Host` de la petición HTTP, encamina la solicitud hacia el `Service` correspondiente (`App1`, `App2` o `App3`). K3s utiliza **Traefik** como su controlador de Ingress por defecto.
 

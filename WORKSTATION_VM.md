@@ -52,23 +52,7 @@ qemu-system-x86_64 \
 ```
 Va lento (emulación por software) — solo para comprobar que el escritorio arranca y entrar por SSH, no para levantar `p1`/`p2`/`p3` de verdad (eso solo funciona con CPU real, en el campus).
 
----
-
-## 3. Acceder por SSH
-
-```bash
-ssh -p 12222 iot@127.0.0.1
-```
-Usuario `iot`, contraseña `iot` (puerto `2222` si arrancaste por la Vía B/VirtualBox del paso 5).
-
-Si sale "Host key verification failed" (VM reiniciada/recreada):
-```bash
-ssh-keygen -R "[127.0.0.1]:12222"
-```
-
----
-
-## 4. Meter el proyecto dentro
+## 3. Meter el proyecto dentro
 
 En el ordenador (fuera de la VM), dentro de la carpeta del repo:
 ```bash
@@ -83,6 +67,20 @@ Dentro de la VM:
 mkdir -p ~/inception-of-things-42 && tar xzf ~/proyecto.tar.gz -C ~/inception-of-things-42
 ```
 Descomprime el proyecto ahí dentro.
+
+---
+
+## 4. Acceder por SSH
+
+```bash
+ssh -p 12222 iot@127.0.0.1
+```
+Usuario `iot`, contraseña `iot` (puerto `2222` si arrancaste por la Vía B/VirtualBox del paso 5).
+
+Si sale "Host key verification failed" (VM reiniciada/recreada):
+```bash
+ssh-keygen -R "[127.0.0.1]:12222"
+```
 
 ---
 
