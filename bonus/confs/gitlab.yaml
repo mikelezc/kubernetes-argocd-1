@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: gitlab
-        image: gitlab/gitlab-ce:19.2.1-ce.0
+        image: gitlab/gitlab-ce:19.4.0-ce.0 # Se pasó de 19.2.1-ce.0 a 19.4.0-ce.0 el 10 de septiembre de 2026, pero no es cambio de versión mayor, solo de parche.
         ports:
         - name: http
           containerPort: 80
