@@ -91,9 +91,9 @@ else
     CONFS_DIR="$BONUS_ROOT/confs"
 fi
 
-wait_for_vm_dns() {
+wait_for_dns() {
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if getent hosts raw.githubusercontent.com >/dev/null 2>&1; then
+        if curl -sSf --max-time 3 -o /dev/null https://raw.githubusercontent.com; then
             return 0
         fi
         sleep 2
@@ -101,9 +101,9 @@ wait_for_vm_dns() {
     return 1
 }
 
-log "Esperando a que el DNS de la VM esté listo..."
-if ! wait_for_vm_dns; then
-    echo "[ERROR] La VM no tiene salida a Internet. Prueba a recrear p3 con la RAM ya puesta desde el arranque, sin pasar por reload:" >&2
+log "Esperando a que haya DNS/salida a Internet..."
+if ! wait_for_dns; then
+    echo "[ERROR] No hay salida a Internet. Si esto corre dentro de la VM de p3, prueba a recrearla con la RAM ya puesta desde el arranque, sin pasar por reload:" >&2
     echo "        cd p3 && vagrant destroy -f && P3_MEMORY=8192 P3_CPUS=3 vagrant up" >&2
     exit 1
 fi
